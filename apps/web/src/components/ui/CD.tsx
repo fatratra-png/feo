@@ -10,18 +10,18 @@ interface CDProps {
 
 const SIZE_MAP = { sm: 'size-12', md: 'size-20', lg: 'size-44' };
 
-const PALETTES: [string, string][] = [
-  ['#FFD700', '#FF6B9D'],
-  ['#0057FF', '#00D68F'],
-  ['#B366FF', '#FF9500'],
-  ['#FF3B30', '#00C7BE'],
-  ['#FF6B9D', '#B366FF'],
-  ['#00D68F', '#FFD700'],
-  ['#FF9500', '#0057FF'],
-  ['#00C7BE', '#FF3B30'],
+const PALETTES: [string, string, string][] = [
+  ['#FFD700', '#FFA500', '#FF6347'],
+  ['#FF6B9D', '#C71585', '#8B008B'],
+  ['#0057FF', '#00BFFF', '#00CED1'],
+  ['#00D68F', '#20B2AA', '#008B8B'],
+  ['#B366FF', '#9370DB', '#6A5ACD'],
+  ['#FF9500', '#FF8C00', '#FF4500'],
+  ['#FF3B30', '#DC143C', '#8B0000'],
+  ['#00C7BE', '#48D1CC', '#008B8B'],
 ];
 
-function hashPalette(title: string): [string, string] {
+function hashPalette(title: string): [string, string, string] {
   let hash = 0;
   for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
   return PALETTES[Math.abs(hash) % PALETTES.length];
@@ -29,9 +29,9 @@ function hashPalette(title: string): [string, string] {
 
 export function CD({ title = '', artist = '', size = 'sm', className = '', spinning }: CDProps) {
   const isPlaying = usePlayerStore((s) => s.isPlaying);
-  const [c1, c2] = title ? hashPalette(title) : PALETTES[0];
+  const [c1, c2, c3] = title ? hashPalette(title) : PALETTES[0];
   const isSpinning = spinning ?? isPlaying;
-  const ringCount = size === 'lg' ? 5 : size === 'md' ? 4 : 3;
+  const sz = size === 'lg' ? 176 : size === 'md' ? 80 : 48;
   
   return (
     <div className={`relative flex-shrink-0 ${SIZE_MAP[size]} ${className}`}>
@@ -39,9 +39,8 @@ export function CD({ title = '', artist = '', size = 'sm', className = '', spinn
         <div 
           className="absolute -inset-2 rounded-full"
           style={{ 
-            background: `conic-gradient(${c1}, ${c2}, ${c1})`,
-            opacity: 0.3,
-            filter: 'blur(8px)',
+            background: `radial-gradient(circle, ${c1}50 0%, transparent 70%)`,
+            filter: 'blur(10px)',
           }}
         />
       )}
@@ -51,62 +50,73 @@ export function CD({ title = '', artist = '', size = 'sm', className = '', spinn
           isSpinning ? 'cd-spin' : ''
         }`}
         style={{
-          border: `${size === 'lg' ? '5px' : '4px'} solid #000`,
-          boxShadow: `5px 5px 0 0 #000`,
+          border: `${size === 'lg' ? '4px' : '3px'} solid #000`,
+          boxShadow: `4px 4px 0 0 #000, inset 0 0 ${sz * 0.15}px rgba(0,0,0,0.6)`,
         }}
       >
-        {/* Bold alternating rings */}
-        {Array.from({ length: ringCount }).map((_, i) => {
-          const inset = 8 + i * (size === 'lg' ? 12 : size === 'md' ? 14 : 16);
-          const ringSize = size === 'lg' ? 12 : size === 'md' ? 14 : 16;
-          return (
-            <div
-              key={i}
-              className="absolute rounded-full"
-              style={{
-                inset: `${inset}%`,
-                background: i % 2 === 0 ? c1 : c2,
-                border: '3px solid #000',
-              }}
-            />
-          );
-        })}
+        {/* Dark vinyl base */}
+        <div className="absolute inset-0 rounded-full" style={{
+          background: `radial-gradient(circle at 30% 30%, #1a1a1a 0%, #0d0d0d 50%, #050505 100%)`,
+        }} />
+
+        {/* Holographic rainbow sweep */}
+        <div className="absolute inset-0 rounded-full" style={{
+          background: `conic-gradient(from 0deg, 
+            ${c1}18 0deg, transparent 30deg, 
+            ${c2}12 90deg, transparent 120deg, 
+            ${c3}18 180deg, transparent 210deg, 
+            ${c1}12 270deg, transparent 300deg, 
+            ${c2}18 360deg)`,
+        }} />
+
+        {/* Bold accent ring */}
+        <div className="absolute rounded-full" style={{
+          inset: '18%',
+          border: `${size === 'lg' ? '3px' : '2px'} solid ${c1}`,
+          boxShadow: `0 0 8px ${c1}40`,
+        }} />
+
+        {/* Thin groove lines */}
+        {[28, 36, 44, 52, 60, 68].map((pct) => (
+          <div key={pct} className="absolute rounded-full" style={{
+            inset: `${pct}%`,
+            border: `0.5px solid rgba(255,255,255,0.06)`,
+          }} />
+        ))}
 
         {/* Center label */}
         <div
           className="absolute rounded-full flex items-center justify-center z-10"
           style={{
-            inset: size === 'lg' ? '32%' : size === 'md' ? '34%' : '32%',
-            background: `linear-gradient(135deg, ${c1}, ${c2})`,
-            border: `${size === 'lg' ? '4px' : '3px'} solid #000`,
-            boxShadow: `3px 3px 0 0 #000`,
+            inset: size === 'lg' ? '30%' : size === 'md' ? '32%' : '30%',
+            background: `linear-gradient(135deg, ${c1} 0%, ${c2} 100%)`,
+            border: `${size === 'lg' ? '3px' : '2px'} solid #000`,
+            boxShadow: `2px 2px 0 0 #000, inset 0 2px 4px rgba(255,255,255,0.3)`,
           }}
         >
-          {/* Cross pattern on label */}
-          <div className="absolute" style={{
-            width: '60%',
-            height: '2px',
-            background: '#000',
-            opacity: 0.2,
-          }} />
-          <div className="absolute" style={{
-            width: '2px',
-            height: '60%',
-            background: '#000',
-            opacity: 0.2,
+          {/* Inner detail ring */}
+          <div className="absolute rounded-full" style={{
+            inset: '20%',
+            border: `1px solid rgba(0,0,0,0.15)`,
           }} />
 
           {/* Center hole */}
           <div
             className="relative rounded-full z-20"
             style={{
-              width: size === 'lg' ? '18px' : size === 'md' ? '12px' : '8px',
-              height: size === 'lg' ? '18px' : size === 'md' ? '12px' : '8px',
+              width: size === 'lg' ? '14px' : size === 'md' ? '9px' : '6px',
+              height: size === 'lg' ? '14px' : size === 'md' ? '9px' : '6px',
               background: '#080808',
-              border: `3px solid #000`,
+              border: `2px solid #000`,
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)',
             }}
           />
         </div>
+
+        {/* Metallic sheen */}
+        <div className="absolute inset-0 rounded-full pointer-events-none" style={{
+          background: `linear-gradient(145deg, rgba(255,255,255,0.1) 0%, transparent 35%, transparent 65%, rgba(255,255,255,0.03) 100%)`,
+        }} />
       </div>
     </div>
   );
