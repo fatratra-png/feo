@@ -116,8 +116,8 @@ export function PlayerPanel() {
 
   if (!currentTrack) {
     return (
-      <div className="fixed bottom-6 right-6 z-[60] w-[260px] rounded-xl border-2 border-border bg-card/95 backdrop-blur-md brutal-shadow-ink overflow-hidden transition-all duration-300">
-        <div className="h-0.5 w-full bg-gradient-to-r from-border via-border to-border" />
+      <div className="fixed bottom-6 right-6 z-[60] w-[260px] rounded-xl border-[3px] border-black bg-card/95 backdrop-blur-md overflow-hidden transition-all duration-300" style={{ boxShadow: '4px 4px 0 0 #000' }}>
+        <div className="h-1 w-full bg-gradient-to-r from-saffron via-blush to-mint" />
         <div className="p-3">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="size-10 rounded-full bg-muted animate-pulse" />

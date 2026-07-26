@@ -9,38 +9,31 @@ interface CDProps {
 }
 
 const SIZE_MAP = { sm: 'size-12', md: 'size-20', lg: 'size-44' };
-const LABEL_MAP = { sm: 'size-5', md: 'size-8', lg: 'size-16' };
-const HOLE_MAP = { sm: 'size-1.5', md: 'size-2', lg: 'size-3' };
 
-const PALETTES = [
-  ['#FFD700', '#FFA500', '#FF6347'],
-  ['#FF6B9D', '#FF1493', '#C71585'],
-  ['#0057FF', '#00BFFF', '#00CED1'],
-  ['#00D68F', '#20B2AA', '#008B8B'],
-  ['#B366FF', '#9370DB', '#6A5ACD'],
-  ['#FF9500', '#FF8C00', '#FF7F50'],
-  ['#FF3B30', '#DC143C', '#B22222'],
-  ['#00C7BE', '#48D1CC', '#40E0D0'],
-];
+const COLORS = ['#FFD700', '#FF6B9D', '#0057FF', '#00D68F', '#B366FF', '#FF9500', '#FF3B30', '#00C7BE'];
 
-function hashPalette(title: string): string[] {
+function hashColor(title: string): string {
   let hash = 0;
   for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
-  return PALETTES[Math.abs(hash) % PALETTES.length];
+  return COLORS[Math.abs(hash) % COLORS.length];
 }
 
 export function CD({ title = '', artist = '', size = 'sm', className = '', spinning }: CDProps) {
   const isPlaying = usePlayerStore((s) => s.isPlaying);
-  const palette = title ? hashPalette(title) : PALETTES[0];
+  const accent = title ? hashColor(title) : '#FFD700';
   const isSpinning = spinning ?? isPlaying;
-  const grooveCount = size === 'lg' ? 12 : size === 'md' ? 8 : 5;
+  const grooves = size === 'lg' ? 10 : size === 'md' ? 7 : 4;
+  const borderW = size === 'lg' ? '4px' : size === 'md' ? '3px' : '2px';
   
   return (
     <div className={`relative flex-shrink-0 ${SIZE_MAP[size]} ${className}`}>
       {isSpinning && (
         <div 
-          className="absolute -inset-1 rounded-full animate-pulse-glow opacity-50 blur-sm"
-          style={{ background: `radial-gradient(circle, ${palette[0]}40 0%, transparent 70%)` }}
+          className="absolute -inset-1.5 rounded-full opacity-60"
+          style={{ 
+            backgroundColor: accent,
+            boxShadow: `0 0 0 3px #000, 0 0 20px ${accent}60`,
+          }}
         />
       )}
       
@@ -49,64 +42,64 @@ export function CD({ title = '', artist = '', size = 'sm', className = '', spinn
           isSpinning ? 'cd-spin' : ''
         }`}
         style={{
-          background: `radial-gradient(circle at 35% 35%, #2a2a2a 0%, #111 40%, #0a0a0a 70%, #050505 100%)`,
-          boxShadow: `inset 0 0 ${size === 'lg' ? '20px' : '10px'} rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.6)`,
+          border: `${borderW} solid #000`,
+          boxShadow: isSpinning 
+            ? `4px 4px 0 0 #000, inset 0 0 10px rgba(0,0,0,0.5)` 
+            : `3px 3px 0 0 #000, inset 0 0 8px rgba(0,0,0,0.4)`,
+          background: '#111',
         }}
       >
-        {/* Outer rim highlight */}
-        <div className="absolute inset-0 rounded-full" style={{
-          background: `conic-gradient(from 0deg, transparent 0deg, rgba(255,255,255,0.06) 20deg, transparent 40deg, rgba(255,255,255,0.04) 180deg, transparent 200deg, rgba(255,255,255,0.06) 340deg, transparent 360deg)`,
-        }} />
-
-        {/* Vinyl grooves */}
-        {Array.from({ length: grooveCount }).map((_, i) => {
-          const pct = 30 + (i * (size === 'lg' ? 4.5 : size === 'md' ? 5 : 6));
+        {/* Bold concentric rings */}
+        {Array.from({ length: grooves }).map((_, i) => {
+          const inset = 22 + (i * (size === 'lg' ? 5.5 : size === 'md' ? 6.5 : 8));
           return (
             <div
               key={i}
               className="absolute rounded-full"
               style={{
-                inset: `${pct}%`,
-                border: `0.5px solid rgba(255,255,255,${0.04 + (i % 2) * 0.02})`,
+                inset: `${inset}%`,
+                border: `${size === 'lg' ? '1.5px' : '1px'} solid ${i % 2 === 0 ? '#222' : '#1a1a1a'}`,
               }}
             />
           );
         })}
 
-        {/* Subtle rainbow refraction */}
+        {/* Conic accent reflection */}
         <div className="absolute inset-0 rounded-full" style={{
-          background: `conic-gradient(from 45deg, transparent 0deg, rgba(255,100,100,0.03) 60deg, rgba(100,255,100,0.03) 120deg, rgba(100,100,255,0.03) 180deg, rgba(255,255,100,0.03) 240deg, rgba(255,100,255,0.03) 300deg, transparent 360deg)`,
+          background: `conic-gradient(from 0deg, ${accent}15 0deg, transparent 30deg, ${accent}10 180deg, transparent 210deg, ${accent}15 360deg)`,
         }} />
 
-        {/* Center label */}
+        {/* Center label - solid neo-brutal */}
         <div
           className="absolute rounded-full flex items-center justify-center"
           style={{
-            inset: size === 'lg' ? '28%' : size === 'md' ? '30%' : '28%',
-            background: `radial-gradient(circle at 40% 35%, ${palette[1]} 0%, ${palette[0]} 50%, ${palette[2]} 100%)`,
-            boxShadow: `inset 0 1px 3px rgba(255,255,255,0.3), inset 0 -1px 3px rgba(0,0,0,0.3)`,
+            inset: size === 'lg' ? '26%' : size === 'md' ? '28%' : '26%',
+            background: accent,
+            border: `${size === 'lg' ? '3px' : '2px'} solid #000`,
+            boxShadow: `2px 2px 0 0 #000`,
           }}
         >
-          {/* Label texture lines */}
-          <div className="absolute inset-0 rounded-full overflow-hidden" style={{
-            background: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 3px)`,
+          {/* Inner ring on label */}
+          <div className="absolute rounded-full" style={{
+            inset: '15%',
+            border: `1px solid rgba(0,0,0,0.2)`,
           }} />
-          
+
           {/* Center hole */}
           <div
             className="relative rounded-full z-10"
             style={{
-              width: size === 'lg' ? '14px' : size === 'md' ? '8px' : '6px',
-              height: size === 'lg' ? '14px' : size === 'md' ? '8px' : '6px',
-              background: '#0a0a0a',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.1)',
+              width: size === 'lg' ? '16px' : size === 'md' ? '10px' : '7px',
+              height: size === 'lg' ? '16px' : size === 'md' ? '10px' : '7px',
+              background: '#080808',
+              border: `2px solid #000`,
             }}
           />
         </div>
 
-        {/* Light reflection */}
+        {/* Top-left highlight */}
         <div className="absolute inset-0 rounded-full pointer-events-none" style={{
-          background: `linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 50%, transparent 100%)`,
+          background: `linear-gradient(135deg, rgba(255,255,255,0.07) 0%, transparent 40%)`,
         }} />
       </div>
     </div>
