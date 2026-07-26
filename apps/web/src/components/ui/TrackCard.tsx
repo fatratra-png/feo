@@ -19,7 +19,6 @@ interface TrackCardProps {
 }
 
 const ACCENTS = ['#FFD700', '#FF6B9D', '#00D68F', '#0057FF', '#B366FF', '#FF9500'];
-const BG = '#f5f0e8';
 
 function hashAccent(title: string): string {
   let hash = 0;
@@ -48,75 +47,81 @@ export function TrackCard({ track, index }: TrackCardProps) {
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group relative flex flex-col rounded-2xl cursor-pointer transition-all duration-200 overflow-hidden ${
-        isActive ? '' : 'hover:-translate-y-1'
-      }`}
+      className="group relative flex flex-col rounded-xl cursor-pointer transition-all duration-200 overflow-hidden"
       style={{
-        background: isActive ? accent + '15' : BG,
-        border: `4px solid ${isActive ? accent : '#1a1a1a'}`,
-        boxShadow: isActive 
-          ? `4px 4px 0 0 ${accent}` 
-          : isHovered 
-            ? `5px 5px 0 0 ${accent}60` 
-            : '4px 4px 0 0 #1a1a1a',
+        background: isActive ? `${accent}12` : '#161616',
+        border: `1px solid ${isActive ? `${accent}50` : '#252525'}`,
+        transform: isHovered ? 'translateY(-2px)' : undefined,
       }}
     >
-      {/* Top accent stripe */}
-      <div className="h-2 w-full" style={{ background: accent }} />
-
       {/* Visual area */}
-      <div className="relative px-4 pt-3 pb-2 flex items-center gap-3">
-        <CD title={track.title} artist={track.artist_name} size="sm" />
+      <div className="relative p-4 pb-2 flex items-center gap-3">
+        <div className="relative flex-shrink-0">
+          <CD title={track.title} artist={track.artist_name} size="sm" />
+          {isCurrentlyPlaying && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="flex gap-0.5">
+                <span className="w-0.5 h-3 rounded-full animate-pulse" style={{ background: accent }} />
+                <span className="w-0.5 h-3 rounded-full animate-pulse" style={{ background: accent, animationDelay: '0.15s' }} />
+                <span className="w-0.5 h-3 rounded-full animate-pulse" style={{ background: accent, animationDelay: '0.3s' }} />
+              </span>
+            </div>
+          )}
+        </div>
 
         <div className="flex-1 min-w-0">
-          <p className={`font-display font-bold text-xs leading-tight truncate ${
-            isActive ? '' : 'text-[#1a1a1a]'
-          }`} style={{ color: isActive ? '#1a1a1a' : undefined }}>
+          <p className={`font-display font-bold text-[11px] leading-tight truncate transition-colors ${
+            isActive ? 'text-white' : 'text-white/80 group-hover:text-white'
+          }`}>
             {track.title}
           </p>
-          <p className="text-[9px] font-mono text-[#1a1a1a]/40 mt-0.5 truncate">
+          <p className="text-[9px] font-mono text-white/30 mt-0.5 truncate group-hover:text-white/40 transition-colors">
             {track.artist_name}
           </p>
         </div>
 
         {/* Play indicator */}
-        <div className={`flex-shrink-0 size-8 rounded-full flex items-center justify-center transition-all duration-200 ${
+        <div className={`flex-shrink-0 size-7 rounded-full flex items-center justify-center transition-all duration-200 ${
           isCurrentlyPlaying ? 'scale-100' : 'scale-0 group-hover:scale-100'
         }`} style={{ 
-          background: accent,
-          border: '3px solid #1a1a1a',
-          boxShadow: '2px 2px 0 0 #1a1a1a',
+          background: isCurrentlyPlaying ? accent : '#252525',
+          border: '1px solid #333',
         }}>
           {isCurrentlyPlaying ? (
             <span className="flex gap-px">
-              <span className="w-0.5 h-2.5 bg-[#1a1a1a] rounded-full" />
-              <span className="w-0.5 h-2.5 bg-[#1a1a1a] rounded-full" />
+              <span className="w-0.5 h-2 bg-black/70 rounded-full" />
+              <span className="w-0.5 h-2 bg-black/70 rounded-full" />
             </span>
           ) : (
-            <span className="text-[#1a1a1a] text-xs ml-0.5">&#9654;</span>
+            <span className="text-white/60 text-[10px] ml-0.5">&#9654;</span>
           )}
         </div>
       </div>
 
       {/* Bottom info */}
-      <div className="px-4 pb-3 flex items-center justify-between">
+      <div className="px-4 pb-3 pt-1 flex items-center justify-between">
         <div className="flex items-center gap-2">
           {isYoutube && (
-            <span className="text-[7px] font-mono font-bold px-2 py-0.5 rounded-full bg-[#1a1a1a] text-white" style={{ boxShadow: '1px 1px 0 0 #1a1a1a' }}>
+            <span className="text-[7px] font-mono font-semibold px-1.5 py-0.5 rounded bg-white/5 text-white/30">
               YT
             </span>
           )}
-          <span className="text-[8px] font-mono text-[#1a1a1a]/30 tabular-nums">
+          <span className="text-[8px] font-mono text-white/20 tabular-nums">
             {formatDuration(track.duration)}
           </span>
         </div>
         
         {isYoutube && track.plays_count && (
-          <span className="text-[8px] font-mono text-[#1a1a1a]/30 tabular-nums">
+          <span className="text-[8px] font-mono text-white/20 tabular-nums">
             {(track.plays_count / 1000000).toFixed(1)}M
           </span>
         )}
       </div>
+
+      {/* Active indicator line */}
+      {isActive && (
+        <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{ background: accent }} />
+      )}
     </div>
   );
 }
