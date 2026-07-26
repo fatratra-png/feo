@@ -54,89 +54,78 @@ export function TrackCard({ track, index }: TrackCardProps) {
       onClick={handleClick}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      className={`group relative flex flex-col rounded-xl border-2 cursor-pointer transition-all duration-300 hover:-translate-y-2 active:translate-y-0 overflow-hidden ${
-        isActive ? 'border-saffron bg-saffron/10 brutal-shadow-saffron' : 'border-border bg-card hover:border-foreground/30'
+      className={`group relative flex flex-col rounded-xl border-2 cursor-pointer transition-all duration-300 hover:-translate-y-1.5 active:translate-y-0 overflow-hidden ${
+        isActive ? 'border-saffron bg-saffron/8 brutal-shadow-saffron' : 'border-border bg-card hover:border-foreground/30'
       }`}
       style={{
-        boxShadow: isHovered && !isActive ? `4px 4px 0 0 ${accent}40` : undefined,
+        boxShadow: isHovered && !isActive ? `3px 3px 0 0 ${accent}30` : undefined,
       }}
     >
-      {/* Ripple effect */}
       {ripple && (
         <span
           className="absolute rounded-full bg-white/30 pointer-events-none animate-ping"
-          style={{
-            left: ripple.x - 20,
-            top: ripple.y - 20,
-            width: 40,
-            height: 40,
-          }}
+          style={{ left: ripple.x - 20, top: ripple.y - 20, width: 40, height: 40 }}
         />
       )}
 
-      <div className="relative aspect-square flex items-center justify-center bg-muted/20 overflow-hidden" style={{ background: isActive ? undefined : `linear-gradient(135deg, ${accent}08, transparent)` }}>
+      <div className="relative aspect-square flex items-center justify-center bg-muted/20 overflow-hidden" style={{ background: isActive ? undefined : `linear-gradient(135deg, ${accent}06, transparent)` }}>
         <CD title={track.title} artist={track.artist_name} size="md" />
         
-        {/* Play/Pause overlay */}
         <div className={`absolute inset-0 flex items-center justify-center transition-all duration-300 ${
           isCurrentlyPlaying ? 'opacity-100 bg-foreground/20' : 'opacity-0 group-hover:opacity-100 bg-foreground/10'
         }`}>
           <span 
-            className={`size-14 rounded-full border-2 border-background flex items-center justify-center backdrop-blur-sm transition-all duration-300 ${
-              isCurrentlyPlaying ? 'scale-100' : 'scale-90 group-hover:scale-110'
+            className={`size-12 rounded-full border-2 border-background flex items-center justify-center backdrop-blur-sm transition-all duration-300 ${
+              isCurrentlyPlaying ? 'scale-100' : 'scale-90 group-hover:scale-105'
             }`}
-            style={{ backgroundColor: `${accent}80` }}
+            style={{ backgroundColor: `${accent}70` }}
           >
             {isCurrentlyPlaying ? (
-              <span className="flex gap-1">
-                <span className="w-1 h-5 bg-background rounded-full animate-pulse" />
-                <span className="w-1 h-5 bg-background rounded-full animate-pulse" style={{ animationDelay: '0.15s' }} />
+              <span className="flex gap-0.5">
+                <span className="w-0.5 h-4 bg-background rounded-full animate-pulse" />
+                <span className="w-0.5 h-4 bg-background rounded-full animate-pulse" style={{ animationDelay: '0.15s' }} />
               </span>
             ) : (
-              <span className="text-background text-xl ml-1">&#9654;</span>
+              <span className="text-background text-base ml-0.5">&#9654;</span>
             )}
           </span>
         </div>
 
         {isYoutube && (
-          <span className="absolute top-2 right-2 chip text-[6px] px-1.5 py-0.5 bg-blush text-white border-white z-10">
+          <span className="absolute top-1.5 right-1.5 chip text-[5px] px-1 py-0 bg-blush text-white border-white z-10">
             YT
           </span>
         )}
 
-        {/* Active indicator */}
         {isCurrentlyPlaying && (
-          <div className="absolute bottom-2 left-2 flex items-center gap-0.5 z-10">
+          <div className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 z-10">
             {[1, 2, 3].map((i) => (
               <span
                 key={i}
                 className="w-0.5 bg-saffron rounded-full animate-pulse"
-                style={{
-                  height: `${8 + Math.random() * 8}px`,
-                  animationDelay: `${i * 0.1}s`,
-                }}
+                style={{ height: `${6 + Math.random() * 6}px`, animationDelay: `${i * 0.1}s` }}
               />
             ))}
           </div>
         )}
       </div>
 
-      <div className="px-3 py-3 min-w-0">
-        <p className={`font-display font-bold text-xs leading-tight truncate transition-colors ${
+      <div className="px-2.5 py-2 min-w-0">
+        <p className={`font-display font-bold text-[10px] leading-tight truncate transition-colors ${
           isActive ? 'text-saffron' : 'text-foreground/90 group-hover:text-foreground'
         }`}>
           {track.title}
         </p>
-        <p className="text-[9px] font-mono text-foreground/40 mt-1 truncate group-hover:text-foreground/60 transition-colors">
+        <p className="text-[8px] font-mono text-foreground/40 mt-0.5 truncate group-hover:text-foreground/60 transition-colors">
           {track.artist_name}
         </p>
-        <div className="flex items-center gap-2 mt-2">
+        <div className="flex items-center gap-1.5 mt-1.5">
           {isYoutube && track.plays_count ? (
-            <span className="chip text-[6px] border-saffron/30 text-saffron">
+            <span className="chip text-[5px] border-saffron/30 text-saffron">
               {(track.plays_count / 1000000).toFixed(1)}M
             </span>
           ) : null}
-          <span className="chip text-[6px] tabular-nums">{formatDuration(track.duration)}</span>
+          <span className="chip text-[5px] tabular-nums">{formatDuration(track.duration)}</span>
         </div>
       </div>
     </div>

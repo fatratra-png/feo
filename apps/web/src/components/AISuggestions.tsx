@@ -42,8 +42,6 @@ export function AISuggestions() {
         setError('Using default suggestions');
       }
     } catch (err: any) {
-      console.error('Failed to load AI suggestions:', err);
-      // If we get a 503 with fallback suggestions
       if (err.message?.includes('503') || err.message?.includes('unavailable')) {
         try {
           const fallbackData = await recommendationsApi.getAISuggestions(userPreference, currentMood, genre);
@@ -82,26 +80,26 @@ export function AISuggestions() {
   };
 
   return (
-    <div className="space-y-4 p-4 bg-gradient-to-b from-saffron/5 to-blush/5 rounded-2xl border-2 border-saffron/20">
-      <div className="flex items-center gap-2 mb-4">
-        <Sparkles className="w-5 h-5 text-saffron" />
-        <h2 className="font-bold text-lg text-foreground">AI Suggestions</h2>
+    <div className="space-y-3 p-3 bg-gradient-to-b from-saffron/5 to-transparent rounded-xl border-2 border-border">
+      <div className="flex items-center gap-2">
+        <Sparkles className="w-4 h-4 text-saffron" />
+        <h2 className="font-bold text-sm text-foreground">AI Suggestions</h2>
       </div>
 
       {error && (
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-blush/10 border border-blush/20 text-blush text-xs">
-          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+        <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-blush/10 border border-blush/20 text-blush text-[9px] font-mono">
+          <AlertCircle className="w-3 h-3 flex-shrink-0" />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="space-y-3 mb-4">
+      <div className="space-y-2">
         <div>
-          <label className="text-xs font-mono text-foreground/60 block mb-1">Preference</label>
+          <label className="text-[9px] font-mono text-foreground/50 uppercase tracking-wider block mb-1">Preference</label>
           <select
             value={userPreference}
             onChange={(e) => setUserPreference(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border-2 border-foreground/20 bg-card text-sm text-foreground"
+            className="w-full px-2.5 py-1.5 rounded-lg border-2 border-border bg-card text-xs text-foreground"
           >
             <option value="relaxing">Relaxing</option>
             <option value="energetic">Energetic</option>
@@ -112,11 +110,11 @@ export function AISuggestions() {
         </div>
 
         <div>
-          <label className="text-xs font-mono text-foreground/60 block mb-1">Mood</label>
+          <label className="text-[9px] font-mono text-foreground/50 uppercase tracking-wider block mb-1">Mood</label>
           <select
             value={currentMood}
             onChange={(e) => setCurrentMood(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border-2 border-foreground/20 bg-card text-sm text-foreground"
+            className="w-full px-2.5 py-1.5 rounded-lg border-2 border-border bg-card text-xs text-foreground"
           >
             <option value="chill">Chill</option>
             <option value="party">Party</option>
@@ -127,11 +125,11 @@ export function AISuggestions() {
         </div>
 
         <div>
-          <label className="text-xs font-mono text-foreground/60 block mb-1">Genre</label>
+          <label className="text-[9px] font-mono text-foreground/50 uppercase tracking-wider block mb-1">Genre</label>
           <select
             value={genre}
             onChange={(e) => setGenre(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg border-2 border-foreground/20 bg-card text-sm text-foreground"
+            className="w-full px-2.5 py-1.5 rounded-lg border-2 border-border bg-card text-xs text-foreground"
           >
             <option value="any">Any</option>
             <option value="hip-hop">Hip-hop</option>
@@ -146,27 +144,27 @@ export function AISuggestions() {
         <button
           onClick={loadSuggestions}
           disabled={loading}
-          className="w-full px-4 py-2 rounded-lg bg-saffron text-black font-bold text-sm hover:bg-saffron/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+          className="w-full px-3 py-2 rounded-lg bg-saffron text-black font-bold text-xs hover:bg-saffron/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-1.5 brutal-shadow-sm active:translate-y-0.5"
         >
-          {loading ? <Loader className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          Generate Suggestions
+          {loading ? <Loader className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+          Generate
         </button>
       </div>
 
       {suggestions.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           {suggestions.map((suggestion, idx) => (
             <button
               key={idx}
               onClick={() => handleSearch(suggestion.query)}
               disabled={searching}
-              className="w-full p-3 rounded-lg border-2 border-blush bg-blush/5 hover:bg-blush/10 transition-colors text-left"
+              className="w-full p-2 rounded-lg border-2 border-border bg-card/50 hover:border-foreground/30 transition-colors text-left group"
             >
-              <div className="font-mono font-bold text-sm text-foreground flex items-center gap-2">
-                {searching ? <Loader className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+              <div className="font-mono font-bold text-[10px] text-foreground flex items-center gap-1.5">
+                {searching ? <Loader className="w-2.5 h-2.5 animate-spin" /> : <Search className="w-2.5 h-2.5 text-foreground/40" />}
                 {suggestion.query}
               </div>
-              <p className="text-xs text-foreground/60 mt-1">{suggestion.explanation}</p>
+              <p className="text-[8px] text-foreground/40 mt-0.5 group-hover:text-foreground/60 transition-colors">{suggestion.explanation}</p>
             </button>
           ))}
         </div>
