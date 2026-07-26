@@ -10,30 +10,36 @@ interface CDProps {
 
 const SIZE_MAP = { sm: 'size-12', md: 'size-20', lg: 'size-44' };
 
-const ACCENTS = ['#FFD700', '#FF6B9D', '#00D68F', '#0057FF', '#B366FF', '#FF9500'];
+const PALETTES: [string, string][] = [
+  ['#FFD700', '#f5f0e8'],
+  ['#FF6B9D', '#f5f0e8'],
+  ['#00D68F', '#f5f0e8'],
+  ['#0057FF', '#f5f0e8'],
+  ['#B366FF', '#f5f0e8'],
+  ['#FF9500', '#f5f0e8'],
+];
 
-function hashAccent(title: string): string {
+function hashPalette(title: string): [string, string] {
   let hash = 0;
   for (let i = 0; i < title.length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
-  return ACCENTS[Math.abs(hash) % ACCENTS.length];
+  return PALETTES[Math.abs(hash) % PALETTES.length];
 }
 
 export function CD({ title = '', artist = '', size = 'sm', className = '', spinning }: CDProps) {
   const isPlaying = usePlayerStore((s) => s.isPlaying);
-  const accent = title ? hashAccent(title) : '#FFD700';
+  const [accent, bg] = title ? hashPalette(title) : PALETTES[0];
   const isSpinning = spinning ?? isPlaying;
-  const r = size === 'lg' ? 88 : size === 'md' ? 40 : 24;
-  const bw = size === 'lg' ? '4px' : '3px';
+  const bw = size === 'lg' ? '5px' : '4px';
   
   return (
     <div className={`relative flex-shrink-0 ${SIZE_MAP[size]} ${className}`}>
       {isSpinning && (
         <div 
-          className="absolute -inset-1 rounded-full"
+          className="absolute -inset-1.5 rounded-full"
           style={{ 
             background: accent,
-            opacity: 0.25,
-            filter: 'blur(6px)',
+            opacity: 0.3,
+            filter: 'blur(8px)',
           }}
         />
       )}
@@ -43,53 +49,49 @@ export function CD({ title = '', artist = '', size = 'sm', className = '', spinn
           isSpinning ? 'cd-spin' : ''
         }`}
         style={{
-          border: `${bw} solid #000`,
-          boxShadow: `3px 3px 0 0 #000`,
+          border: `${bw} solid #1a1a1a`,
+          boxShadow: `3px 3px 0 0 #1a1a1a`,
+          background: bg,
         }}
       >
-        {/* Base vinyl */}
-        <div className="absolute inset-0" style={{
-          background: `radial-gradient(circle at 35% 35%, #1c1c1c, #0a0a0a 70%)`,
+        {/* Accent ring */}
+        <div className="absolute rounded-full" style={{
+          inset: '10%',
+          border: `${size === 'lg' ? '4px' : '3px'} solid ${accent}`,
+          boxShadow: `inset 0 0 0 2px ${bg}`,
         }} />
 
-        {/* Three-tone rings: outer/mid/inner using accent */}
-        <div className="absolute rounded-full" style={{ inset: '8%', border: `2px solid ${accent}40` }} />
-        <div className="absolute rounded-full" style={{ inset: '20%', border: `1.5px solid ${accent}25` }} />
-        <div className="absolute rounded-full" style={{ inset: '32%', border: `1px solid ${accent}15` }} />
-
-        {/* Fine grooves */}
-        {[40, 48, 56, 64].map((p) => (
-          <div key={p} className="absolute rounded-full" style={{ inset: `${p}%`, border: '0.5px solid rgba(255,255,255,0.04)' }} />
-        ))}
+        {/* Inner accent ring */}
+        <div className="absolute rounded-full" style={{
+          inset: '25%',
+          border: `${size === 'lg' ? '2px' : '1.5px'} solid ${accent}80`,
+        }} />
 
         {/* Center label */}
         <div
           className="absolute rounded-full flex items-center justify-center z-10"
           style={{
-            inset: size === 'lg' ? '28%' : '30%',
-            background: `linear-gradient(135deg, ${accent}, ${accent}cc)`,
-            border: `${size === 'lg' ? '3px' : '2px'} solid #000`,
-            boxShadow: `2px 2px 0 0 #000`,
+            inset: size === 'lg' ? '32%' : '34%',
+            background: accent,
+            border: `${size === 'lg' ? '4px' : '3px'} solid #1a1a1a`,
+            boxShadow: `2px 2px 0 0 #1a1a1a`,
           }}
         >
-          {/* Spindle ring */}
-          <div className="absolute rounded-full" style={{ inset: '25%', border: '1px solid rgba(0,0,0,0.2)' }} />
-          
           {/* Center hole */}
           <div
             className="relative rounded-full z-20"
             style={{
-              width: size === 'lg' ? '12px' : size === 'md' ? '8px' : '5px',
-              height: size === 'lg' ? '12px' : size === 'md' ? '8px' : '5px',
-              background: '#080808',
-              border: '2px solid #000',
+              width: size === 'lg' ? '14px' : size === 'md' ? '9px' : '6px',
+              height: size === 'lg' ? '14px' : size === 'md' ? '9px' : '6px',
+              background: bg,
+              border: `2px solid #1a1a1a`,
             }}
           />
         </div>
 
         {/* Sheen */}
         <div className="absolute inset-0 rounded-full pointer-events-none" style={{
-          background: 'linear-gradient(145deg, rgba(255,255,255,0.08) 0%, transparent 40%)',
+          background: 'linear-gradient(145deg, rgba(255,255,255,0.4) 0%, transparent 40%)',
         }} />
       </div>
     </div>
