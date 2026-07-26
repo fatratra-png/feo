@@ -49,6 +49,7 @@ function setCache(key: string, result: RecommendationResult): void {
 }
 
 async function getTrackById(id: string): Promise<TrackRow | null> {
+  if (id.startsWith('yt__')) return null;
   const res = await query(
     `SELECT t.*, a.name as artist_name, al.title as album_title, al.cover_url as album_cover_url
      FROM tracks t
