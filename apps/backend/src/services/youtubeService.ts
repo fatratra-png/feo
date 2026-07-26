@@ -1,5 +1,5 @@
 import { execFileSync } from 'child_process';
-import { cleanTitle, extractMetadata, detectGenre, relatedSearchQuery } from './metadataCleaner';
+import { extractMetadata, detectGenre, relatedSearchQuery } from './metadataCleaner';
 
 interface YouTubeTrack {
   id: string;

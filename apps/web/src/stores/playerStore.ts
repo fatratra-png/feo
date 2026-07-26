@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, youtubeApi } from '../lib/api';
+import { api, youtubeApi, recommendationsApi } from '../lib/api';
 
 interface Track {
   id: string;
@@ -34,6 +34,7 @@ interface PlayerState {
   playHistory: Track[];
   gaplessPlayback: boolean;
   isPanelCollapsed: boolean;
+  lastPrevClickTime: number;
 
   play: (track: Track, queue?: Track[]) => void;
   setTrackAudioUrl: (trackId: string, url: string) => void;
@@ -104,6 +105,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   playHistory: [],
   gaplessPlayback: true,
   isPanelCollapsed: false,
+  lastPrevClickTime: 0,
 
   play: (track, queue) => {
     const state = get();
@@ -187,10 +189,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   next: () => {
-    console.log('[DEBUG] next() called');
     const { queue, queueIndex, repeat, autoPlay, currentTrack, shuffle, originalQueue } = get();
     const history = [...get().playHistory];
-    console.log('[DEBUG] Queue state:', { queueLength: queue.length, queueIndex, repeat, autoPlay });
 
     if (currentTrack) {
       const existingIdx = history.findIndex(t => t.id === currentTrack.id);
@@ -205,103 +205,114 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     let nextIndex = queueIndex + 1;
 
-    if (nextIndex >= queue.length) {
-      if (repeat === 'all' && queue.length > 0) {
-        nextIndex = 0;
-        const nextTrack = queue[nextIndex];
-        const needsFetch = needsAudioFetch(nextTrack);
-        set({
-          currentTrack: nextTrack,
-          queueIndex: nextIndex,
-          isPlaying: !needsFetch,
-          progress: 0,
-          isLoadingAudio: needsFetch,
-          playHistory: history.slice(-50),
-        });
-        if (needsFetch && nextTrack.youtube_id) {
-          youtubeApi.getAudioUrl(nextTrack.youtube_id)
-            .then((data: any) => {
-              if (data.audioUrl) {
-                get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
-                set({ isPlaying: true, isLoadingAudio: false });
-              }
-            })
-            .catch(() => set({ isLoadingAudio: false }));
-        }
-        return;
-      } else if (autoPlay && currentTrack) {
-        set({ isLoadingAudio: true, playHistory: history.slice(-50) });
-        const query = `${currentTrack.title} ${currentTrack.artist_name}`;
-        youtubeApi.related(query)
+    if (nextIndex < queue.length) {
+      const nextTrack = queue[nextIndex];
+      const needsFetch = needsAudioFetch(nextTrack);
+      set({
+        currentTrack: nextTrack,
+        queueIndex: nextIndex,
+        isPlaying: !needsFetch,
+        progress: 0,
+        isLoadingAudio: needsFetch,
+        playHistory: history.slice(-50),
+      });
+      if (needsFetch && nextTrack.youtube_id) {
+        youtubeApi.getAudioUrl(nextTrack.youtube_id)
           .then((data: any) => {
-            const tracks = data.tracks || [];
-            const filtered = tracks.filter((t: any) => t.id !== currentTrack.id);
-            if (filtered.length > 0) {
-              const nextTrack = filtered[0];
-              const newQueue = [...get().queue.filter(t => t.id !== nextTrack.id), nextTrack];
-              const newOriginal = originalQueue.length > 0 ? originalQueue : newQueue;
-              const needsFetch = needsAudioFetch(nextTrack);
-              set({
-                currentTrack: nextTrack,
-                queue: newQueue,
-                originalQueue: newOriginal,
-                queueIndex: newQueue.length - 1,
-                isPlaying: !needsFetch,
-                progress: 0,
-                isLoadingAudio: needsFetch,
-              });
-              if (needsFetch && nextTrack.youtube_id) {
-                youtubeApi.getAudioUrl(nextTrack.youtube_id)
-                  .then((data: any) => {
-                    if (data.audioUrl) {
-                      get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
-                      set({ isPlaying: true, isLoadingAudio: false });
-                    }
-                  })
-                  .catch(() => set({ isLoadingAudio: false }));
-              }
-            } else {
-              set({ isPlaying: false, isLoadingAudio: false });
+            if (data.audioUrl) {
+              get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
+              set({ isPlaying: true, isLoadingAudio: false });
             }
           })
           .catch(() => set({ isLoadingAudio: false }));
-        return;
-      } else {
-        set({
-          isPlaying: false,
-          currentTrack: null,
-          queueIndex: -1,
-          playHistory: history.slice(-50),
-        });
-        return;
       }
+      return;
     }
 
-    const nextTrack = queue[nextIndex];
-    const needsFetch = needsAudioFetch(nextTrack);
-    set({
-      currentTrack: nextTrack,
-      queueIndex: nextIndex,
-      isPlaying: !needsFetch,
-      progress: 0,
-      isLoadingAudio: needsFetch,
-      playHistory: history.slice(-50),
-    });
+    if (repeat === 'all' && queue.length > 0) {
+      const nextTrack = queue[0];
+      const needsFetch = needsAudioFetch(nextTrack);
+      set({
+        currentTrack: nextTrack,
+        queueIndex: 0,
+        isPlaying: !needsFetch,
+        progress: 0,
+        isLoadingAudio: needsFetch,
+        playHistory: history.slice(-50),
+      });
+      if (needsFetch && nextTrack.youtube_id) {
+        youtubeApi.getAudioUrl(nextTrack.youtube_id)
+          .then((data: any) => {
+            if (data.audioUrl) {
+              get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
+              set({ isPlaying: true, isLoadingAudio: false });
+            }
+          })
+          .catch(() => set({ isLoadingAudio: false }));
+      }
+      return;
+    }
 
-    if (needsFetch && nextTrack.youtube_id) {
-      youtubeApi.getAudioUrl(nextTrack.youtube_id)
+    // Queue exhausted — fetch AI recommendations for next song
+    if (currentTrack) {
+      set({ isLoadingAudio: true, playHistory: history.slice(-50) });
+
+      recommendationsApi.getUpNext(currentTrack.id, 5)
         .then((data: any) => {
-          if (data.audioUrl) {
-            get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
-            set({ isPlaying: true, isLoadingAudio: false });
+          const tracks = data.tracks || [];
+          const filtered = tracks.filter((t: any) => t.id !== currentTrack.id);
+
+          if (filtered.length > 0) {
+            const nextTrack = filtered[0];
+            const newQueue = [...get().queue, nextTrack];
+            const needsFetch = needsAudioFetch(nextTrack);
+            set({
+              currentTrack: nextTrack,
+              queue: newQueue,
+              originalQueue: originalQueue.length > 0 ? originalQueue : newQueue,
+              queueIndex: newQueue.length - 1,
+              isPlaying: !needsFetch,
+              progress: 0,
+              isLoadingAudio: needsFetch,
+            });
+            if (needsFetch && nextTrack.youtube_id) {
+              youtubeApi.getAudioUrl(nextTrack.youtube_id)
+                .then((d: any) => {
+                  if (d.audioUrl) {
+                    get().setTrackAudioUrl(nextTrack.id, d.audioUrl);
+                    set({ isPlaying: true, isLoadingAudio: false });
+                  }
+                })
+                .catch(() => set({ isLoadingAudio: false }));
+            }
+          } else {
+            set({ isPlaying: false, isLoadingAudio: false });
           }
         })
-        .catch(() => set({ isLoadingAudio: false }));
+        .catch(() => {
+          set({ isPlaying: false, isLoadingAudio: false });
+        });
+      return;
     }
+
+    set({ isPlaying: false, currentTrack: null, queueIndex: -1, playHistory: history.slice(-50) });
   },
 
   previous: () => {
-    const { queue, queueIndex, playHistory } = get();
+    const { queue, queueIndex, playHistory, progress, lastPrevClickTime, currentTrack } = get();
+    const now = Date.now();
+    const timeSinceLastClick = now - lastPrevClickTime;
+    
+    // If progress is more than 3 seconds OR this is the first click in 2 seconds, replay from start
+    if (progress > 3 || timeSinceLastClick > 2000) {
+      set({ lastPrevClickTime: now });
+      get().replay();
+      return;
+    }
+    
+    // Second click within 2 seconds and progress <= 3 seconds: go to previous track
+    set({ lastPrevClickTime: now });
+    
     const prevIndex = queueIndex - 1;
     if (prevIndex >= 0) {
       const prevTrack = queue[prevIndex];
@@ -495,12 +506,32 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   },
 
   populateQueueWithRecommendations: async (track: Track) => {
-    console.log('[DEBUG] populateQueueWithRecommendations called for track:', track.title);
     try {
-      const response = await api(`/recommendations/up-next?track_id=${track.id}&limit=15`);
-      console.log('[DEBUG] API response received:', response);
+      // Use the recommendations API to get AI-based suggestions
+      const response = await recommendationsApi.getUpNext(track.id, 15);
       const recommendedTracks = response.tracks || [];
-      console.log('[DEBUG] Recommended tracks count:', recommendedTracks.length);
+      
+      if (recommendedTracks.length === 0) {
+        // If no recommendations from backend, try YouTube related tracks
+        try {
+          const ytResponse = await youtubeApi.related(`${track.title} ${track.artist_name}`);
+          const ytTracks = (ytResponse as any).tracks || [];
+          const filtered = ytTracks.filter((t: any) => t.id !== track.id);
+          
+          if (filtered.length > 0) {
+            const currentQueue = get().queue;
+            const newTracks = filtered.filter((t: any) => !currentQueue.find(q => q.id === t.id));
+            
+            if (newTracks.length > 0) {
+              const updatedQueue = [...currentQueue, ...newTracks].slice(0, 50);
+              set({ queue: updatedQueue });
+            }
+          }
+        } catch (ytErr) {
+          // YouTube related also failed, silently continue
+        }
+        return;
+      }
 
       // Filter out current track
       const filtered = recommendedTracks.filter((t: any) => t.id !== track.id);
@@ -511,13 +542,29 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         const newTracks = filtered.filter((t: any) => !currentQueue.find(q => q.id === t.id));
         
         if (newTracks.length > 0) {
-          const updatedQueue = [...currentQueue, ...newTracks].slice(0, 50); // Cap at 50 tracks
-          console.log('[DEBUG] Queue updated with', newTracks.length, 'new tracks. Total queue length:', updatedQueue.length);
+          const updatedQueue = [...currentQueue, ...newTracks].slice(0, 50);
           set({ queue: updatedQueue });
         }
       }
     } catch (err) {
-      console.error('[DEBUG] Failed to populate queue:', err);
+      // Recommendation API failed, try YouTube as fallback
+      try {
+        const ytResponse = await youtubeApi.related(`${track.title} ${track.artist_name}`);
+        const ytTracks = (ytResponse as any).tracks || [];
+        const filtered = ytTracks.filter((t: any) => t.id !== track.id);
+        
+        if (filtered.length > 0) {
+          const currentQueue = get().queue;
+          const newTracks = filtered.filter((t: any) => !currentQueue.find(q => q.id === t.id));
+          
+          if (newTracks.length > 0) {
+            const updatedQueue = [...currentQueue, ...newTracks].slice(0, 50);
+            set({ queue: updatedQueue });
+          }
+        }
+      } catch (ytErr) {
+        // Both failed, queue will remain as is
+      }
     }
   },
 

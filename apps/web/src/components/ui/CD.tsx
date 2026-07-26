@@ -24,20 +24,32 @@ export function CD({ title = '', artist = '', size = 'sm', className = '', spinn
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const accent = title ? hashColor(title) : '#FFD700';
   const isSpinning = spinning ?? isPlaying;
+  
   return (
     <div className={`relative flex-shrink-0 ${SIZE_MAP[size]} ${className}`}>
+      {/* Glow effect when spinning */}
+      {isSpinning && (
+        <div 
+          className="absolute inset-0 rounded-full animate-pulse-glow opacity-50"
+          style={{ backgroundColor: `${accent}30` }}
+        />
+      )}
       <div
-        className={`w-full h-full rounded-full border-2 border-foreground flex items-center justify-center overflow-hidden ${
+        className={`relative w-full h-full rounded-full border-2 border-foreground flex items-center justify-center overflow-hidden transition-all duration-300 ${
           isSpinning ? 'cd-spin' : ''
         }`}
         style={{
           background: `conic-gradient(${accent} 0deg, #fff 90deg, ${accent} 180deg, #ddd 270deg, ${accent} 360deg)`,
         }}
       >
-        <div className={`${HOLE_SIZES[size]} rounded-full bg-background border-2 border-foreground flex items-center justify-center`}>
+        {/* Vinyl grooves effect */}
+        <div className="absolute inset-2 rounded-full border border-foreground/10" />
+        <div className="absolute inset-4 rounded-full border border-foreground/10" />
+        <div className="absolute inset-6 rounded-full border border-foreground/10" />
+        
+        <div className={`${HOLE_SIZES[size]} rounded-full bg-background border-2 border-foreground flex items-center justify-center z-10`}>
           <div className={`${INNER_SIZES[size]} rounded-full`} style={{ backgroundColor: accent }} />
         </div>
-
       </div>
     </div>
   );

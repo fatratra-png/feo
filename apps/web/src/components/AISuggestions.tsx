@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Sparkles, Search, Loader } from 'lucide-react';
+import { Sparkles, Search, Loader, AlertCircle } from 'lucide-react';
 import { recommendationsApi } from '../lib/api';
 import { searchApi } from '../lib/api';
 import { usePlayerStore } from '../stores/playerStore';
@@ -13,6 +13,7 @@ export function AISuggestions() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [userPreference, setUserPreference] = useState('relaxing');
   const [currentMood, setCurrentMood] = useState('chill');
   const [genre, setGenre] = useState('any');
@@ -24,16 +25,41 @@ export function AISuggestions() {
 
   const loadSuggestions = async () => {
     setLoading(true);
+    setError(null);
     try {
       const data = await recommendationsApi.getAISuggestions(userPreference, currentMood, genre);
-      setSuggestions(data.suggestions || data.fallback || []);
-    } catch (err) {
+      if (data.suggestions) {
+        setSuggestions(data.suggestions);
+      } else if (data.fallback) {
+        setSuggestions(data.fallback);
+        setError('AI service unavailable, showing default suggestions');
+      } else {
+        setSuggestions([
+          { query: 'trending music', explanation: 'Popular tracks right now' },
+          { query: 'relaxing ambient', explanation: 'Chill background music' },
+          { query: 'focus beats', explanation: 'Music for concentration' }
+        ]);
+        setError('Using default suggestions');
+      }
+    } catch (err: any) {
       console.error('Failed to load AI suggestions:', err);
+      // If we get a 503 with fallback suggestions
+      if (err.message?.includes('503') || err.message?.includes('unavailable')) {
+        try {
+          const fallbackData = await recommendationsApi.getAISuggestions(userPreference, currentMood, genre);
+          if (fallbackData.fallback) {
+            setSuggestions(fallbackData.fallback);
+            setError('AI service unavailable, showing default suggestions');
+            return;
+          }
+        } catch {}
+      }
       setSuggestions([
         { query: 'trending music', explanation: 'Popular tracks right now' },
         { query: 'relaxing ambient', explanation: 'Chill background music' },
         { query: 'focus beats', explanation: 'Music for concentration' }
       ]);
+      setError('Using default suggestions');
     } finally {
       setLoading(false);
     }
@@ -61,6 +87,13 @@ export function AISuggestions() {
         <Sparkles className="w-5 h-5 text-saffron" />
         <h2 className="font-bold text-lg text-foreground">AI Suggestions</h2>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 p-2 rounded-lg bg-blush/10 border border-blush/20 text-blush text-xs">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
 
       <div className="space-y-3 mb-4">
         <div>

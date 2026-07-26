@@ -13,7 +13,7 @@ export const authService = {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await userRepository.create(email, passwordHash, displayName);
-    const tokens = await this.generateTokens(user.id);
+    const tokens = this.generateTokens(user.id);
     return { user, ...tokens };
   },
 
@@ -28,7 +28,7 @@ export const authService = {
       throw new AppError(401, 'Invalid email or password');
     }
 
-    const tokens = await this.generateTokens(user.id);
+    const tokens = this.generateTokens(user.id);
     const { password_hash, ...safeUser } = user;
     return { user: safeUser, ...tokens };
   },
@@ -42,7 +42,7 @@ export const authService = {
     try {
       const decoded = jwt.verify(refreshToken, config.jwt.refreshSecret) as { userId: string };
       await userRepository.deleteRefreshToken(refreshToken);
-      const tokens = await this.generateTokens(decoded.userId);
+      const tokens = this.generateTokens(decoded.userId);
       return tokens;
     } catch {
       throw new AppError(401, 'Invalid refresh token');
@@ -53,17 +53,21 @@ export const authService = {
     await userRepository.deleteUserRefreshTokens(userId);
   },
 
-  async generateTokens(userId: string) {
-    const accessToken = jwt.sign({ userId }, config.jwt.secret, {
-      expiresIn: config.jwt.accessExpiry,
-    });
+  generateTokens(userId: string) {
+    const accessToken = jwt.sign(
+      { userId } as object,
+      config.jwt.secret,
+      { expiresIn: '15m' as const }
+    );
 
-    const refreshToken = jwt.sign({ userId }, config.jwt.refreshSecret, {
-      expiresIn: config.jwt.refreshExpiry,
-    });
+    const refreshToken = jwt.sign(
+      { userId } as object,
+      config.jwt.refreshSecret,
+      { expiresIn: '7d' as const }
+    );
 
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await userRepository.saveRefreshToken(userId, refreshToken, expiresAt);
+    userRepository.saveRefreshToken(userId, refreshToken, expiresAt);
 
     return { accessToken, refreshToken };
   },

@@ -53,7 +53,7 @@ export const youtubeController = {
 
   async getAudioUrl(req: Request, res: Response, next: NextFunction) {
     try {
-      const { youtubeId } = req.params;
+      const youtubeId = req.params.youtubeId as string;
       const audioUrl = youtubeService.getAudioUrl(youtubeId);
       if (!audioUrl) return res.status(404).json({ message: 'Could not extract audio URL' });
       res.json({ audioUrl, youtubeId });
@@ -62,7 +62,7 @@ export const youtubeController = {
 
   async getDetails(req: Request, res: Response, next: NextFunction) {
     try {
-      const { youtubeId } = req.params;
+      const youtubeId = req.params.youtubeId as string;
       const details = youtubeService.getDetails(youtubeId);
       if (!details) return res.status(404).json({ message: 'Video not found' });
       res.json(details);

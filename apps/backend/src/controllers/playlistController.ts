@@ -17,9 +17,10 @@ export const playlistController = {
 
   async getById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const playlist = await playlistRepository.findById(req.params.id);
+      const id = req.params.id as string;
+      const playlist = await playlistRepository.findById(id);
       if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
-      const tracks = await playlistRepository.getTracks(req.params.id);
+      const tracks = await playlistRepository.getTracks(id);
       res.json({ ...playlist, tracks });
     } catch (err) {
       next(err);
@@ -48,13 +49,14 @@ export const playlistController = {
 
   async update(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const playlist = await playlistRepository.findById(req.params.id);
+      const id = req.params.id as string;
+      const playlist = await playlistRepository.findById(id);
       if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
       if (playlist.user_id !== req.userId) {
         return res.status(403).json({ message: 'Not authorized' });
       }
       const { name, description, cover_url, is_public } = req.body;
-      const updated = await playlistRepository.update(req.params.id, { name, description, cover_url, is_public });
+      const updated = await playlistRepository.update(id, { name, description, cover_url, is_public });
       res.json(updated);
     } catch (err) {
       next(err);
@@ -63,12 +65,13 @@ export const playlistController = {
 
   async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const playlist = await playlistRepository.findById(req.params.id);
+      const id = req.params.id as string;
+      const playlist = await playlistRepository.findById(id);
       if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
       if (playlist.user_id !== req.userId) {
         return res.status(403).json({ message: 'Not authorized' });
       }
-      await playlistRepository.delete(req.params.id);
+      await playlistRepository.delete(id);
       res.json({ message: 'Playlist deleted' });
     } catch (err) {
       next(err);
@@ -77,13 +80,14 @@ export const playlistController = {
 
   async addTrack(req: AuthRequest, res: Response, next: NextFunction) {
     try {
+      const id = req.params.id as string;
       const { trackId } = req.body;
-      const playlist = await playlistRepository.findById(req.params.id);
+      const playlist = await playlistRepository.findById(id);
       if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
       if (playlist.user_id !== req.userId) {
         return res.status(403).json({ message: 'Not authorized' });
       }
-      await playlistRepository.addTrack(req.params.id, trackId);
+      await playlistRepository.addTrack(id, trackId);
       res.json({ message: 'Track added' });
     } catch (err) {
       next(err);
@@ -92,13 +96,14 @@ export const playlistController = {
 
   async removeTrack(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { trackId } = req.params;
-      const playlist = await playlistRepository.findById(req.params.id);
+      const id = req.params.id as string;
+      const trackId = req.params.trackId as string;
+      const playlist = await playlistRepository.findById(id);
       if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
       if (playlist.user_id !== req.userId) {
         return res.status(403).json({ message: 'Not authorized' });
       }
-      await playlistRepository.removeTrack(req.params.id, trackId);
+      await playlistRepository.removeTrack(id, trackId);
       res.json({ message: 'Track removed' });
     } catch (err) {
       next(err);
@@ -107,13 +112,14 @@ export const playlistController = {
 
   async reorderTracks(req: AuthRequest, res: Response, next: NextFunction) {
     try {
+      const id = req.params.id as string;
       const { trackIds } = req.body;
-      const playlist = await playlistRepository.findById(req.params.id);
+      const playlist = await playlistRepository.findById(id);
       if (!playlist) return res.status(404).json({ message: 'Playlist not found' });
       if (playlist.user_id !== req.userId) {
         return res.status(403).json({ message: 'Not authorized' });
       }
-      await playlistRepository.reorderTracks(req.params.id, trackIds);
+      await playlistRepository.reorderTracks(id, trackIds);
       res.json({ message: 'Tracks reordered' });
     } catch (err) {
       next(err);

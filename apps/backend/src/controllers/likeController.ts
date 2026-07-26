@@ -5,7 +5,7 @@ import { AuthRequest } from '../middleware/auth';
 export const likeController = {
   async toggleTrack(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const liked = await likeRepository.toggleTrack(req.userId!, req.params.trackId);
+      const liked = await likeRepository.toggleTrack(req.userId!, req.params.trackId as string);
       res.json({ liked });
     } catch (err) {
       next(err);
@@ -14,7 +14,7 @@ export const likeController = {
 
   async toggleAlbum(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const liked = await likeRepository.toggleAlbum(req.userId!, req.params.albumId);
+      const liked = await likeRepository.toggleAlbum(req.userId!, req.params.albumId as string);
       res.json({ liked });
     } catch (err) {
       next(err);

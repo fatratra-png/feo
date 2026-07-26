@@ -1,5 +1,6 @@
 import { query } from '../db/connection';
 import { getRecommendations } from './llmService';
+import { execFileSync } from 'child_process';
 
 interface TrackRow {
   id: string;
@@ -21,7 +22,7 @@ interface TrackRow {
 
 interface RecommendationResult {
   tracks: TrackRow[];
-  source: 'artist' | 'genre' | 'popular' | 'llm';
+  source: 'artist' | 'genre' | 'popular' | 'llm' | 'youtube';
   reasoning: string;
 }
 
@@ -116,14 +117,27 @@ async function sameGenreTracks(track: TrackRow, excludeId: string, excludeArtist
 }
 
 async function popularFallback(genre: string, excludeIds: string[], limit = 5): Promise<TrackRow[]> {
+  if (excludeIds.length === 0) {
+    const genreClause = genre ? `AND t.genre = $1` : '';
+    const res = await query(
+      `SELECT t.*, a.name as artist_name, al.title as album_title, al.cover_url as album_cover_url
+       FROM tracks t
+       JOIN artists a ON t.artist_id = a.id
+       JOIN albums al ON t.album_id = al.id
+       WHERE 1=1 ${genreClause}
+       ORDER BY t.plays_count DESC
+       LIMIT $${genre ? 2 : 1}`,
+      genre ? [genre, limit] : [limit],
+    );
+    return res.rows;
+  }
   const excludePlaceholders = excludeIds.map((_, i) => `$${i + 2}`).join(',');
-  const genreClause = genre ? `AND (t.genre = $1 OR t.genre = '')` : '';
   const res = await query(
     `SELECT t.*, a.name as artist_name, al.title as album_title, al.cover_url as album_cover_url
      FROM tracks t
      JOIN artists a ON t.artist_id = a.id
      JOIN albums al ON t.album_id = al.id
-     WHERE t.id NOT IN (${excludePlaceholders || "'__none__'"}) ${genre ? `AND t.genre = $1` : ''}
+     WHERE t.id NOT IN (${excludePlaceholders}) ${genre ? `AND t.genre = $1` : ''}
      ORDER BY t.plays_count DESC
      LIMIT $1`,
     genre ? [genre, ...excludeIds] : [limit, ...excludeIds],
@@ -140,6 +154,54 @@ function dedupe(tracks: TrackRow[]): TrackRow[] {
   });
 }
 
+function ytSearchTracks(query: string, maxResults: number): TrackRow[] {
+  try {
+    const output = execFileSync('yt-dlp', [
+      '--dump-json',
+      '--no-warnings',
+      '--flat-playlist',
+      `ytsearch${maxResults}:${query}`
+    ], {
+      timeout: 15000,
+      encoding: 'utf-8',
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    return output.trim().split('\n').filter(Boolean).map((line) => {
+      try {
+        const data = JSON.parse(line);
+        const thumbnail = data.thumbnail || data.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${data.id}/hqdefault.jpg`;
+        const channelName = data.channel || data.uploader || data.channel_id || 'YouTube';
+        return {
+          id: `yt__${data.id}`,
+          title: (data.title || 'Unknown').substring(0, 100),
+          duration: typeof data.duration === 'number' ? Math.round(data.duration) : 0,
+          file_url: null,
+          track_number: 0,
+          artist_id: '',
+          album_id: '',
+          genre: '',
+          tags: [],
+          mood: '',
+          tempo: 0,
+          plays_count: data.view_count || 0,
+          artist_name: channelName.substring(0, 60),
+          album_title: 'YouTube',
+          album_cover_url: thumbnail,
+        } as TrackRow;
+      } catch { return null; }
+    }).filter(Boolean) as TrackRow[];
+  } catch {
+    return [];
+  }
+}
+
+function parseYoutubeId(id: string): string | null {
+  if (id.startsWith('yt__')) return id.substring(4);
+  return null;
+}
+
 export async function getUpNext(
   trackId: string,
   userId: string,
@@ -150,7 +212,63 @@ export async function getUpNext(
   if (cached) return cached;
 
   const track = await getTrackById(trackId);
+
   if (!track) {
+    // Track not in database — likely a YouTube track. Use YouTube related search.
+    const ytId = parseYoutubeId(trackId);
+    if (ytId) {
+      try {
+        const output = execFileSync('yt-dlp', [
+          '--dump-json',
+          '--no-warnings',
+          '--flat-playlist',
+          `ytsearch${limit + 5}:related music`
+        ], {
+          timeout: 15000,
+          encoding: 'utf-8',
+          maxBuffer: 10 * 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        const tracks: TrackRow[] = output.trim().split('\n').filter(Boolean).map((line) => {
+          try {
+            const data = JSON.parse(line);
+            if (data.id === ytId) return null;
+            const thumbnail = data.thumbnail || data.thumbnails?.[0]?.url || `https://i.ytimg.com/vi/${data.id}/hqdefault.jpg`;
+            const channelName = data.channel || data.uploader || 'YouTube';
+            return {
+              id: `yt__${data.id}`,
+              title: (data.title || 'Unknown').substring(0, 100),
+              duration: typeof data.duration === 'number' ? Math.round(data.duration) : 0,
+              file_url: null,
+              track_number: 0,
+              artist_id: '',
+              album_id: '',
+              genre: '',
+              tags: [],
+              mood: '',
+              tempo: 0,
+              plays_count: data.view_count || 0,
+              artist_name: channelName.substring(0, 60),
+              album_title: 'YouTube',
+              album_cover_url: thumbnail,
+            } as TrackRow;
+          } catch { return null; }
+        }).filter(Boolean) as TrackRow[];
+
+        const uniqueTracks = dedupe(tracks).slice(0, limit);
+        const result: RecommendationResult = {
+          tracks: uniqueTracks,
+          source: 'youtube',
+          reasoning: 'YouTube related tracks for non-database track',
+        };
+        setCache(key, result);
+        return result;
+      } catch {
+        // YouTube search failed
+      }
+    }
+
     const popular = await popularFallback('', [], limit);
     const result: RecommendationResult = { tracks: popular, source: 'popular', reasoning: 'Track not found, showing popular tracks' };
     setCache(key, result);

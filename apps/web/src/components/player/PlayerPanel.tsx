@@ -4,7 +4,6 @@ import { NextTrackDisplay } from './NextTrackDisplay';
 import { CD } from '../ui/CD';
 import { formatDuration } from '../../lib/utils';
 import {
-  X,
   Shuffle,
   SkipBack,
   SkipForward,
@@ -17,23 +16,27 @@ import {
   ListMusic,
   Mic2,
   ChevronRight,
+  ChevronUp,
   ChevronDown,
+  X,
+  Loader,
 } from 'lucide-react';
 
 export function PlayerPanel() {
   const [showQueue, setShowQueue] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
     currentTrack, isPlaying, volume, progress, queue, queueIndex,
     pause, next, previous, isLoadingAudio, repeat, autoPlay, shuffle, isMuted,
     setVolume, setProgress, cycleRepeat, toggleShuffle, toggleMute, toggleAutoPlay,
-    removeFromQueue, clearQueue, playNext, isPanelCollapsed, togglePanel, expandPanel,
+    removeFromQueue, clearQueue, playNext,
   } = usePlayerStore();
 
   const resume = useCallback(() => usePlayerStore.getState().resume(), []);
-  const isOpen = !!currentTrack;
-  const isExpanded = !isPanelCollapsed;
 
   useEffect(() => {
     if (!audioRef.current) audioRef.current = new Audio();
@@ -74,6 +77,14 @@ export function PlayerPanel() {
     };
   }, [next, setProgress]);
 
+  useEffect(() => {
+    if (currentTrack) {
+      setIsTransitioning(true);
+      const timer = setTimeout(() => setIsTransitioning(false), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [currentTrack?.id]);
+
   const seek = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = parseFloat(e.target.value);
     setProgress(val);
@@ -82,164 +93,296 @@ export function PlayerPanel() {
 
   const progressPct = currentTrack && currentTrack.duration > 0 ? (progress / currentTrack.duration) * 100 : 0;
 
-  return (
-    <>
-      {currentTrack && !isExpanded && (
-        <button
-          onClick={expandPanel}
-          className="fixed bottom-6 right-6 z-[60] size-14 rounded-full border-2 border-saffron bg-card brutal-shadow-saffron flex items-center justify-center hover:scale-110 active:scale-95 transition-transform"
-        >
-          <CD title={currentTrack.title} artist={currentTrack.artist_name} size="sm" />
-        </button>
-      )}
-
-      <div
-        className={`fixed top-0 right-0 h-full w-full md:w-[420px] bg-background border-l-2 border-border z-50 flex flex-col transition-all duration-500 ease-out ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        } md:translate-x-0 ${
-          isExpanded ? 'md:translate-x-0' : 'md:translate-x-full'
-        }`}
+  if (!visible) {
+    return (
+      <button
+        onClick={() => setVisible(true)}
+        className="fixed top-6 right-6 z-[60] size-12 rounded-full border-2 border-border bg-card brutal-shadow-sm flex items-center justify-center hover:scale-110 active:scale-95 transition-all text-foreground/40 hover:text-saffron hover:border-saffron"
       >
-        <div className="h-1 w-full bg-gradient-to-r from-saffron via-blush to-mint flex-shrink-0" />
-        <div className="flex items-center justify-between px-6 py-4 border-b-2 border-border">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex size-2.5">
-              <span className="absolute inset-0 rounded-full bg-saffron animate-ping opacity-40" />
-              <span className="relative rounded-full bg-saffron size-2.5" />
-            </span>
-            <span className="font-mono text-[9px] tracking-[0.2em] text-saffron uppercase font-bold">Now Playing</span>
+        <Music className="size-5" />
+      </button>
+    );
+  }
+
+  // Empty skeleton state — no track playing
+  if (!currentTrack) {
+    return (
+      <div className="fixed top-6 right-6 z-[60] w-[340px] rounded-2xl border-2 border-border bg-card/95 backdrop-blur-md brutal-shadow-ink overflow-hidden transition-all duration-300">
+        <div className="h-1 w-full bg-gradient-to-r from-border via-border to-border" />
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="size-12 rounded-full bg-muted animate-pulse" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3 w-3/4 rounded bg-muted animate-pulse" />
+              <div className="h-2 w-1/2 rounded bg-muted animate-pulse" />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowQueue(!showQueue)} className={`size-8 flex items-center justify-center rounded-full border-2 transition-all active:translate-y-[1px] ${showQueue ? 'border-saffron bg-saffron/15 text-saffron brutal-shadow-saffron' : 'border-border text-foreground/40 hover:text-foreground hover:bg-muted/30'}`}>
-              <ListMusic className="size-3.5" />
+          <div className="h-1.5 w-full rounded-full bg-muted animate-pulse mb-3" />
+          <div className="flex items-center justify-center gap-3">
+            <div className="size-8 rounded-full bg-muted animate-pulse" />
+            <div className="size-10 rounded-full bg-muted animate-pulse" />
+            <div className="size-14 rounded-full bg-muted animate-pulse" />
+            <div className="size-10 rounded-full bg-muted animate-pulse" />
+            <div className="size-8 rounded-full bg-muted animate-pulse" />
+          </div>
+          <p className="text-center text-[9px] font-mono text-foreground/20 mt-4 uppercase tracking-widest">
+            Play a song to start
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Collapsed mini player
+  if (!expanded) {
+    return (
+      <div className="fixed top-6 right-6 z-[60] w-[340px] rounded-2xl border-2 border-border bg-card/95 backdrop-blur-md brutal-shadow-ink overflow-hidden transition-all duration-300 hover:border-foreground/40 group">
+        {/* Progress bar top edge */}
+        <div className="h-1 w-full bg-muted relative">
+          <div
+            className="absolute top-0 left-0 h-full bg-gradient-to-r from-saffron to-blush transition-all duration-200"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+
+        <div className="flex items-center gap-3 p-3">
+          {/* CD */}
+          <div className="relative flex-shrink-0">
+            <CD title={currentTrack.title} artist={currentTrack.artist_name} size="sm" />
+            {isPlaying && (
+              <span className="absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full bg-mint border-2 border-card animate-pulse" />
+            )}
+          </div>
+
+          {/* Track info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold truncate text-foreground">{currentTrack.title}</p>
+            <p className="text-[9px] font-mono text-foreground/40 truncate">{currentTrack.artist_name}</p>
+          </div>
+
+          {/* Controls */}
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={(e) => { e.stopPropagation(); previous(); }}
+              className="size-8 flex items-center justify-center rounded-full text-foreground/30 hover:text-blush hover:bg-blush/10 transition-all active:scale-90"
+            >
+              <SkipBack className="size-3.5" />
             </button>
-            <button onClick={togglePanel} className={`size-8 flex items-center justify-center rounded-full border-2 transition-all active:translate-y-[1px] ${!isExpanded ? 'border-mint bg-mint/15 text-mint brutal-shadow-mint' : 'border-border text-foreground/40 hover:text-foreground hover:bg-muted/30'}`}>
-              <ChevronDown className={`size-3.5 transition-transform ${!isExpanded ? 'rotate-180' : ''}`} />
+
+            <button
+              onClick={(e) => { e.stopPropagation(); isPlaying ? pause() : resume(); }}
+              className="size-10 flex items-center justify-center rounded-full bg-saffron text-black border-2 border-foreground brutal-shadow-sm transition-all active:scale-90"
+              disabled={isLoadingAudio}
+            >
+              {isLoadingAudio ? (
+                <Loader className="size-4 animate-spin" />
+              ) : isPlaying ? (
+                <Pause className="size-4 fill-black" />
+              ) : (
+                <Play className="size-4 fill-black ml-0.5" />
+              )}
+            </button>
+
+            <button
+              onClick={(e) => { e.stopPropagation(); next(); }}
+              className="size-8 flex items-center justify-center rounded-full text-foreground/30 hover:text-mint hover:bg-mint/10 transition-all active:scale-90"
+            >
+              <SkipForward className="size-3.5" />
+            </button>
+          </div>
+
+          {/* Expand button */}
+          <button
+            onClick={(e) => { e.stopPropagation(); setExpanded(true); }}
+            className="size-8 flex items-center justify-center rounded-full text-foreground/30 hover:text-foreground hover:bg-muted/30 transition-all active:scale-90"
+          >
+            <ChevronUp className="size-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Expanded full player
+  return (
+    <div className="fixed top-6 right-6 z-[60] w-[380px] max-h-[calc(100vh-48px)] rounded-2xl border-2 border-border bg-card/95 backdrop-blur-md brutal-shadow-ink overflow-hidden transition-all duration-300 flex flex-col animate-scaleIn">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b-2 border-border flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="relative flex size-2">
+            <span className="absolute inset-0 rounded-full bg-saffron animate-ping opacity-40" />
+            <span className="relative rounded-full bg-saffron size-2" />
+          </span>
+          <span className="font-mono text-[8px] tracking-[0.2em] text-saffron uppercase font-bold">Now Playing</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowQueue(!showQueue)}
+            className={`size-7 flex items-center justify-center rounded-full border-2 transition-all active:scale-90 ${showQueue ? 'border-saffron bg-saffron/15 text-saffron' : 'border-border text-foreground/30 hover:text-foreground hover:bg-muted/30'}`}
+          >
+            <ListMusic className="size-3" />
+          </button>
+          <button
+            onClick={() => setExpanded(false)}
+            className="size-7 flex items-center justify-center rounded-full border-2 border-border text-foreground/30 hover:text-foreground hover:bg-muted/30 transition-all active:scale-90"
+          >
+            <ChevronDown className="size-3" />
+          </button>
+          <button
+            onClick={() => setVisible(false)}
+            className="size-7 flex items-center justify-center rounded-full border-2 border-border text-foreground/30 hover:text-blush hover:border-blush hover:bg-blush/10 transition-all active:scale-90"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide">
+        <div className="flex flex-col items-center px-5 py-5">
+          {/* CD Art */}
+          <div className={`relative mb-5 transition-all duration-500 ${isTransitioning ? 'animate-scaleIn' : ''}`}>
+            <div className="brutal-shadow-ink rounded-full">
+              <CD title={currentTrack.title} artist={currentTrack.artist_name} size="lg" />
+            </div>
+          </div>
+
+          {/* Track info */}
+          <div className="text-center w-full max-w-xs">
+            <p className="font-display text-lg font-extrabold tracking-tight leading-tight truncate">{currentTrack.title}</p>
+            <p className="text-xs font-mono text-foreground/40 mt-1 flex items-center justify-center gap-1">
+              <Mic2 className="size-3" />
+              {currentTrack.artist_name}
+            </p>
+          </div>
+
+          {/* Progress */}
+          <div className="w-full max-w-xs mt-5 space-y-1.5">
+            <div className="relative h-1.5 bg-muted rounded-full">
+              <div
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-saffron to-blush rounded-full transition-all duration-100"
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between relative">
+              <span className="text-[8px] font-mono text-foreground/30 tabular-nums">{formatDuration(progress)}</span>
+              <input
+                type="range"
+                min={0}
+                max={currentTrack.duration || 100}
+                value={progress}
+                onChange={seek}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+              <span className="text-[8px] font-mono text-foreground/30 tabular-nums">{formatDuration(currentTrack.duration)}</span>
+            </div>
+          </div>
+
+          {/* Next track */}
+          <div className="w-full max-w-xs">
+            <NextTrackDisplay />
+          </div>
+
+          {/* Transport controls */}
+          <div className="flex items-center justify-center gap-1.5 mt-5">
+            <button
+              onClick={toggleShuffle}
+              className={`size-9 flex items-center justify-center rounded-full border-2 transition-all active:scale-90 ${shuffle ? 'border-saffron bg-saffron/15 text-saffron' : 'border-border text-foreground/30 hover:border-foreground/50'}`}
+            >
+              <Shuffle className="size-3.5" />
+            </button>
+            <button
+              onClick={previous}
+              className="size-11 flex items-center justify-center rounded-full border-2 border-border text-foreground/50 hover:text-blush hover:border-blush hover:bg-blush/10 transition-all active:scale-90"
+            >
+              <SkipBack className="size-4.5" />
+            </button>
+            <button
+              onClick={() => isPlaying ? pause() : resume()}
+              className="size-14 flex items-center justify-center rounded-full bg-saffron text-black border-2 border-foreground brutal-shadow-saffron transition-all active:scale-90"
+              disabled={isLoadingAudio}
+            >
+              {isLoadingAudio ? (
+                <Loader className="size-5 animate-spin" />
+              ) : isPlaying ? (
+                <Pause className="size-6 fill-black" />
+              ) : (
+                <Play className="size-6 fill-black ml-0.5" />
+              )}
+            </button>
+            <button
+              onClick={next}
+              className="size-11 flex items-center justify-center rounded-full border-2 border-border text-foreground/50 hover:text-mint hover:border-mint hover:bg-mint/10 transition-all active:scale-90"
+            >
+              <SkipForward className="size-4.5" />
+            </button>
+            <button
+              onClick={cycleRepeat}
+              className={`size-9 flex items-center justify-center rounded-full border-2 transition-all active:scale-90 relative ${repeat !== 'off' ? 'border-saffron bg-saffron/15 text-saffron' : 'border-border text-foreground/30 hover:border-foreground/50'}`}
+            >
+              <Repeat className="size-3.5" />
+              {repeat === 'one' && <span className="absolute text-[6px] font-mono font-bold mt-2.5">1</span>}
+            </button>
+          </div>
+
+          {/* Volume */}
+          <div className="flex items-center gap-3 mt-5 px-3 py-2 rounded-full border-2 border-border bg-gradient-to-r from-saffron/5 via-blush/5 to-mint/5 w-full max-w-xs justify-center">
+            <button
+              onClick={toggleMute}
+              className={`size-7 flex items-center justify-center rounded-full border-2 transition-all active:scale-90 ${isMuted ? 'border-blush bg-blush/15 text-blush' : 'border-border text-foreground/30 hover:text-blush hover:border-blush'}`}
+            >
+              {isMuted || volume === 0 ? <VolumeX className="size-3" /> : <Volume2 className="size-3" />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              onChange={(e) => setVolume(parseFloat(e.target.value))}
+              className="brutal-slider w-20"
+            />
+            <button
+              onClick={toggleAutoPlay}
+              className={`size-7 flex items-center justify-center rounded-full border-2 transition-all active:scale-90 ${autoPlay ? 'border-mint bg-mint/15 text-mint' : 'border-border text-foreground/30 hover:text-mint hover:border-mint'}`}
+            >
+              <Music className="size-3" />
             </button>
           </div>
         </div>
 
-        <div className={`flex-1 flex flex-col items-center justify-center px-6 py-8 overflow-y-auto transition-all duration-300 ${!isExpanded ? 'hidden' : ''}`}>
-          {currentTrack && (
-            <>
-              <div className="relative mb-8 flex-shrink-0 -rotate-6 hover:rotate-0 transition-transform duration-500">
-                <div className="brutal-shadow-ink rounded-full">
-                  <CD title={currentTrack.title} artist={currentTrack.artist_name} size="lg" />
-                </div>
-              </div>
-
-              <div className="text-center w-full max-w-sm">
-                <p className="font-display text-2xl font-extrabold tracking-[-0.02em] leading-tight truncate">{currentTrack.title}</p>
-                <p className="text-sm font-mono text-foreground/50 mt-2 flex items-center justify-center gap-1.5">
-                  <Mic2 className="size-3.5" />
-                  {currentTrack.artist_name}
-                </p>
-              </div>
-
-              <div className="w-full max-w-sm mt-8 space-y-2">
-                <div className="relative h-1.5 bg-muted rounded-full brutal-shadow-ink">
-                  <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-saffron to-blush rounded-full transition-all" style={{ width: `${progressPct}%` }} />
-                </div>
-                <div className="flex items-center justify-between relative">
-                  <span className="text-[9px] font-mono text-foreground/40 tabular-nums">{formatDuration(progress)}</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={currentTrack.duration || 100}
-                    value={progress}
-                    onChange={seek}
-                    className="absolute inset-0 opacity-0 cursor-pointer"
-                  />
-                  <span className="text-[9px] font-mono text-foreground/40 tabular-nums">{formatDuration(currentTrack.duration)}</span>
-                </div>
-              </div>
-
-              <NextTrackDisplay />
-
-              <div className="flex items-center justify-center gap-2 mt-8">
-                <button onClick={toggleShuffle} className={`size-10 flex items-center justify-center rounded-full border-2 transition-all hover:bg-saffron hover:text-black active:translate-y-[2px] brutal-shadow-sm ${shuffle ? 'border-saffron bg-saffron/15 text-saffron' : 'border-border text-foreground/40 hover:border-foreground/50'}`}>
-                  <Shuffle className="size-4" />
-                </button>
-                <button onClick={previous} className="size-12 flex items-center justify-center rounded-full border-2 border-border text-foreground/60 hover:text-blush hover:border-blush hover:bg-blush/10 transition-all active:translate-y-[2px] brutal-shadow-sm">
-                  <SkipBack className="size-5" />
-                </button>
-                <button
-                  onClick={() => (isPlaying ? pause() : resume())}
-                  className="size-16 flex items-center justify-center rounded-full bg-saffron text-black border-2 border-foreground brutal-shadow-saffron transition-all active:translate-y-[3px] active:shadow-[2px_2px_0_0_#FFD700]"
-                  disabled={isLoadingAudio}
-                >
-                  {isLoadingAudio ? (
-                    <span className="size-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                  ) : isPlaying ? (
-                    <Pause className="size-7 fill-black" />
-                  ) : (
-                    <Play className="size-7 fill-black ml-1" />
-                  )}
-                </button>
-                <button onClick={next} className="size-12 flex items-center justify-center rounded-full border-2 border-border text-foreground/60 hover:text-mint hover:border-mint hover:bg-mint/10 transition-all active:translate-y-[2px] brutal-shadow-sm">
-                  <SkipForward className="size-5" />
-                </button>
-                <button onClick={cycleRepeat} className={`size-10 flex items-center justify-center rounded-full border-2 transition-all hover:bg-saffron hover:text-black active:translate-y-[2px] brutal-shadow-sm ${repeat !== 'off' ? 'border-saffron bg-saffron/15 text-saffron' : 'border-border text-foreground/40 hover:border-foreground/50'}`}>
-                  <Repeat className="size-4" />
-                  {repeat === 'one' && <span className="absolute text-[7px] font-mono font-bold mt-3">1</span>}
-                </button>
-              </div>
-
-              <div className="flex items-center gap-4 mt-8 px-4 py-3 rounded-full border-2 border-border bg-gradient-to-r from-saffron/5 via-blush/5 to-mint/5">
-                <button onClick={toggleMute} className={`size-8 flex items-center justify-center rounded-full border-2 transition-all active:translate-y-[1px] ${isMuted ? 'border-blush bg-blush/15 text-blush brutal-shadow-blush' : 'border-border text-foreground/40 hover:text-blush hover:border-blush hover:bg-blush/10'}`}>
-                  {isMuted || volume === 0 ? <VolumeX className="size-3.5" /> : <Volume2 className="size-3.5" />}
-                </button>
-                <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  value={volume}
-                  onChange={(e) => setVolume(parseFloat(e.target.value))}
-                  className="brutal-slider w-24"
-                />
-                <button onClick={toggleAutoPlay} className={`size-8 flex items-center justify-center rounded-full border-2 transition-all active:translate-y-[1px] ${autoPlay ? 'border-mint bg-mint/15 text-mint brutal-shadow-mint' : 'border-border text-foreground/40 hover:text-mint hover:border-mint hover:bg-mint/10'}`}>
-                  <Music className="size-3.5" />
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-
-        {showQueue && isExpanded && currentTrack && (
-          <div className="border-t-2 border-border px-5 py-4 max-h-56 overflow-y-auto transition-all duration-300">
-            <div className="flex items-center justify-between mb-3">
+        {/* Queue */}
+        {showQueue && (
+          <div className="border-t-2 border-border px-4 py-3 max-h-48 overflow-y-auto">
+            <div className="flex items-center justify-between mb-2">
               <span className="flex items-center gap-2">
                 <span className="eyebrow">Up Next</span>
-                <span className="chip text-[7px]">{queue.length}</span>
+                <span className="chip text-[6px]">{queue.length}</span>
               </span>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 {queue.length > 0 && (
-                  <button onClick={clearQueue} className="chip text-[7px] cursor-pointer hover:bg-blush hover:text-white transition-colors">Clear</button>
+                  <button onClick={clearQueue} className="chip text-[6px] cursor-pointer hover:bg-blush hover:text-white transition-colors">Clear</button>
                 )}
-                <button onClick={() => setShowQueue(false)} className="chip text-[7px] cursor-pointer">Close</button>
+                <button onClick={() => setShowQueue(false)} className="chip text-[6px] cursor-pointer">Close</button>
               </div>
             </div>
             <div className="space-y-1">
               {queue.map((track, i) => {
                 const isCurrent = i === queueIndex;
-                const colors = ['border-saffron/30', 'border-blush/30', 'border-mint/30'];
-                const borderColor = colors[i % colors.length];
                 return (
-                  <div key={`${track.id}-${i}`} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 text-sm transition-all hover:-translate-x-0.5 ${isCurrent ? 'border-saffron bg-saffron/10 brutal-shadow-sm' : `${borderColor} bg-card hover:border-foreground/30`}`}>
-                    <span className={`font-mono text-[9px] tabular-nums w-4 flex-shrink-0 ${isCurrent ? 'text-saffron' : 'text-foreground/30'}`}>{i + 1}</span>
-                    <CD title={track.title} artist={track.artist_name} size="sm" />
+                  <div key={`${track.id}-${i}`} className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border-2 text-sm transition-all ${isCurrent ? 'border-saffron bg-saffron/10' : 'border-border/50 bg-muted/20 hover:border-foreground/20'}`}>
+                    <span className={`font-mono text-[8px] tabular-nums w-3 flex-shrink-0 ${isCurrent ? 'text-saffron' : 'text-foreground/20'}`}>{i + 1}</span>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-xs truncate ${isCurrent ? 'font-semibold' : 'text-foreground/90'}`}>{track.title}</p>
-                      <p className="text-[9px] font-mono text-foreground/40 mt-0.5 truncate">{track.artist_name}</p>
+                      <p className={`text-[11px] truncate ${isCurrent ? 'font-semibold text-foreground' : 'text-foreground/80'}`}>{track.title}</p>
+                      <p className="text-[8px] font-mono text-foreground/30 truncate">{track.artist_name}</p>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1">
                       {!isCurrent && (
-                        <button onClick={() => playNext(track)} className="size-6 flex items-center justify-center rounded-full border-2 border-border text-foreground/30 hover:text-mint hover:border-mint transition-all active:translate-y-[1px]">
+                        <button onClick={() => playNext(track)} className="size-5 flex items-center justify-center rounded-full text-foreground/20 hover:text-mint transition-all">
                           <ChevronRight className="size-3" />
                         </button>
                       )}
-                      <button onClick={() => removeFromQueue(track.id)} className="size-6 flex items-center justify-center rounded-full border-2 border-border text-foreground/30 hover:text-blush hover:border-blush transition-all active:translate-y-[1px]">
+                      <button onClick={() => removeFromQueue(track.id)} className="size-5 flex items-center justify-center rounded-full text-foreground/20 hover:text-blush transition-all">
                         <X className="size-2.5" />
                       </button>
                     </div>
@@ -247,14 +390,14 @@ export function PlayerPanel() {
                 );
               })}
               {queue.length === 0 && (
-                <p className="text-xs font-mono text-foreground/30 py-6 text-center">
-                  {autoPlay ? 'Auto-play is on — similar tracks will play next' : 'Queue is empty'}
+                <p className="text-[10px] font-mono text-foreground/20 py-4 text-center">
+                  {autoPlay ? 'Auto-play is on' : 'Queue is empty'}
                 </p>
               )}
             </div>
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
