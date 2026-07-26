@@ -161,6 +161,7 @@ function ytSearchTracks(query: string, maxResults: number): TrackRow[] {
       '--dump-json',
       '--no-warnings',
       '--flat-playlist',
+      '--extractor-args', 'youtube:player_client=ios',
       `ytsearch${maxResults}:${query}`
     ], {
       timeout: 15000,
@@ -223,6 +224,7 @@ export async function getUpNext(
           '--dump-json',
           '--no-warnings',
           '--flat-playlist',
+          '--extractor-args', 'youtube:player_client=ios',
           `ytsearch${limit + 5}:related music`
         ], {
           timeout: 15000,

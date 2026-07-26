@@ -77,6 +77,17 @@ function needsAudioFetch(track: Track): boolean {
   return track.source === 'youtube' && !track.file_url;
 }
 
+const AUDIO_FETCH_TIMEOUT = 12000;
+
+function autoSkipOnFailure(trackId: string, timeout: number = AUDIO_FETCH_TIMEOUT) {
+  return setTimeout(() => {
+    const state = usePlayerStore.getState();
+    if (state.isLoadingAudio && state.currentTrack?.id === trackId) {
+      state.next();
+    }
+  }, timeout);
+}
+
 function shuffleArray<T>(array: T[]): T[] {
   const arr = [...array];
   for (let i = arr.length - 1; i > 0; i--) {
@@ -147,14 +158,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     });
 
     if (needsFetch && track.youtube_id) {
+      const timer = autoSkipOnFailure(track.id);
       youtubeApi.getAudioUrl(track.youtube_id)
         .then((data: any) => {
+          clearTimeout(timer);
           if (data.audioUrl) {
             get().setTrackAudioUrl(track.id, data.audioUrl);
             set({ isPlaying: true, isLoadingAudio: false });
+          } else {
+            get().next();
           }
         })
-        .catch(() => set({ isLoadingAudio: false }));
+        .catch(() => { clearTimeout(timer); get().next(); });
     }
 
     // Auto-populate queue with AI recommendations
@@ -217,14 +232,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         playHistory: history.slice(-50),
       });
       if (needsFetch && nextTrack.youtube_id) {
+        const timer = autoSkipOnFailure(nextTrack.id);
         youtubeApi.getAudioUrl(nextTrack.youtube_id)
           .then((data: any) => {
+            clearTimeout(timer);
             if (data.audioUrl) {
               get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
               set({ isPlaying: true, isLoadingAudio: false });
+            } else {
+              get().next();
             }
           })
-          .catch(() => set({ isLoadingAudio: false }));
+          .catch(() => { clearTimeout(timer); get().next(); });
       }
       return;
     }
@@ -241,14 +260,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         playHistory: history.slice(-50),
       });
       if (needsFetch && nextTrack.youtube_id) {
+        const timer = autoSkipOnFailure(nextTrack.id);
         youtubeApi.getAudioUrl(nextTrack.youtube_id)
           .then((data: any) => {
+            clearTimeout(timer);
             if (data.audioUrl) {
               get().setTrackAudioUrl(nextTrack.id, data.audioUrl);
               set({ isPlaying: true, isLoadingAudio: false });
+            } else {
+              get().next();
             }
           })
-          .catch(() => set({ isLoadingAudio: false }));
+          .catch(() => { clearTimeout(timer); get().next(); });
       }
       return;
     }
@@ -276,14 +299,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
               isLoadingAudio: needsFetch,
             });
             if (needsFetch && nextTrack.youtube_id) {
+              const timer = autoSkipOnFailure(nextTrack.id);
               youtubeApi.getAudioUrl(nextTrack.youtube_id)
                 .then((d: any) => {
+                  clearTimeout(timer);
                   if (d.audioUrl) {
                     get().setTrackAudioUrl(nextTrack.id, d.audioUrl);
                     set({ isPlaying: true, isLoadingAudio: false });
+                  } else {
+                    get().next();
                   }
                 })
-                .catch(() => set({ isLoadingAudio: false }));
+                .catch(() => { clearTimeout(timer); get().next(); });
             }
           } else {
             set({ isPlaying: false, isLoadingAudio: false });
@@ -325,14 +352,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         isLoadingAudio: needsFetch,
       });
       if (needsFetch && prevTrack.youtube_id) {
+        const timer = autoSkipOnFailure(prevTrack.id);
         youtubeApi.getAudioUrl(prevTrack.youtube_id)
           .then((data: any) => {
+            clearTimeout(timer);
             if (data.audioUrl) {
               get().setTrackAudioUrl(prevTrack.id, data.audioUrl);
               set({ isPlaying: true, isLoadingAudio: false });
+            } else {
+              get().next();
             }
           })
-          .catch(() => set({ isLoadingAudio: false }));
+          .catch(() => { clearTimeout(timer); get().next(); });
       }
     } else if (playHistory.length > 0) {
       const prevTrack = playHistory[playHistory.length - 1];
@@ -358,14 +389,18 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
         playHistory: newHistory,
       });
       if (needsFetch && prevTrack.youtube_id) {
+        const timer = autoSkipOnFailure(prevTrack.id);
         youtubeApi.getAudioUrl(prevTrack.youtube_id)
           .then((data: any) => {
+            clearTimeout(timer);
             if (data.audioUrl) {
               get().setTrackAudioUrl(prevTrack.id, data.audioUrl);
               set({ isPlaying: true, isLoadingAudio: false });
+            } else {
+              get().next();
             }
           })
-          .catch(() => set({ isLoadingAudio: false }));
+          .catch(() => { clearTimeout(timer); get().next(); });
       }
     } else {
       get().replay();

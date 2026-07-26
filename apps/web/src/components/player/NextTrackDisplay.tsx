@@ -40,8 +40,9 @@ export function NextTrackDisplay() {
       }
     };
 
-    fetchNextTrack();
-  }, [currentTrack, queue, queueIndex, autoPlay]);
+    const timer = setTimeout(fetchNextTrack, 300);
+    return () => clearTimeout(timer);
+  }, [currentTrack?.id, queue, queueIndex, autoPlay]);
 
   if (!currentTrack) return null;
 

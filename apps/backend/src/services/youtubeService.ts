@@ -49,6 +49,7 @@ function ytSearch(query: string, maxResults: number): YouTubeTrack[] {
     '--dump-json',
     '--no-warnings',
     '--flat-playlist',
+    '--extractor-args', 'youtube:player_client=ios',
     `ytsearch${maxResults}:${query}`
   ], { 
     timeout: 15000, 
@@ -83,28 +84,30 @@ export const youtubeService = {
   },
 
   getAudioUrl(youtubeId: string): string | null {
-    try {
-      if (!/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
-        console.error('Invalid YouTube ID format:', youtubeId);
-        return null;
-      }
-      const url = `https://www.youtube.com/watch?v=${youtubeId}`;
-      const output = execFileSync('yt-dlp', [
-        '-f', 'bestaudio',
-        '--get-url',
-        '--no-warnings',
-        url
-      ], { 
-        timeout: 15000, 
-        encoding: 'utf-8', 
-        maxBuffer: 1024 * 1024,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      return output.trim();
-    } catch (err) {
-      console.error('Failed to get audio URL for', youtubeId, err);
+    if (!/^[a-zA-Z0-9_-]{11}$/.test(youtubeId)) {
       return null;
     }
+    const url = `https://www.youtube.com/watch?v=${youtubeId}`;
+    const clients = ['ios', 'web_creator', 'mweb'];
+    for (const client of clients) {
+      try {
+        const output = execFileSync('yt-dlp', [
+          '-f', 'bestaudio',
+          '--get-url',
+          '--no-warnings',
+          '--extractor-args', `youtube:player_client=${client}`,
+          url
+        ], { 
+          timeout: 12000, 
+          encoding: 'utf-8', 
+          maxBuffer: 1024 * 1024,
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        const trimmed = output.trim();
+        if (trimmed && trimmed.startsWith('http')) return trimmed;
+      } catch { continue; }
+    }
+    return null;
   },
 
   getDetails(youtubeId: string): YouTubeTrack | null {
