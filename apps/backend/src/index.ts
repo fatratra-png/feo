@@ -16,9 +16,17 @@ async function main() {
   app.use('/api', (_req, res) => res.status(404).json({ message: 'Route introuvable' }));
   app.use(errorHandler);
 
-  app.listen(config.port, () => {
+  const server = app.listen(config.port, () => {
     console.log(`FEO API → http://localhost:${config.port}/api`);
     console.log(`AI: ${aiEnabled() ? config.ai.models.join(' → ') : 'disabled (no LLM_API_KEY)'}`);
+  });
+  server.on('error', (err: NodeJS.ErrnoException) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`Port ${config.port} is already in use — another FEO API is probably running.`);
+      console.error(`Find it with: lsof -i :${config.port}   (or start on another port: PORT=3002 npm run dev)`);
+      process.exit(1);
+    }
+    throw err;
   });
 }
 
