@@ -15,7 +15,12 @@ const list = (...values: (string | undefined)[]) =>
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
-  frontendUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  frontendUrl: (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim(),
+  /** Allowed browser origins (comma-separated FRONTEND_URL); Expo web is allowed in development. */
+  corsOrigins: [
+    ...(process.env.FRONTEND_URL || 'http://localhost:5173').split(',').map((o) => o.trim()).filter(Boolean),
+    ...((process.env.NODE_ENV || 'development') === 'development' ? ['http://localhost:8081', 'http://localhost:19006'] : []),
+  ],
   databaseUrl: required('DATABASE_URL'),
   jwt: {
     secret: required('JWT_SECRET'),
