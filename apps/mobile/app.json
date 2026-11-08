@@ -4,21 +4,49 @@
     "slug": "feo",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "backgroundColor": "#F5F5F0"
-    },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.feo.app"
+      "bundleIdentifier": "com.feo.app",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F5F5F0"
+        "backgroundColor": "#f8d02e"
       },
       "package": "com.feo.app"
-    }
+    },
+    "icon": "./assets/icon.png",
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-secure-store",
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff",
+          "dark": {
+            "backgroundColor": "#000000"
+          }
+        }
+      ]
+    ]
   }
 }
