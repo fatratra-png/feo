@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type RequestHandler } from 'express';
 import { Readable } from 'stream';
 import { z } from 'zod';
 import { aiEnabled } from './config';
@@ -10,7 +10,7 @@ import { auth, authenticate } from './services/auth';
 import * as library from './services/library';
 import { aiPausedUntil, consumeAiQuota } from './services/llm';
 import { playlists } from './services/playlists';
-import { youtube } from './services/youtube';
+import { youtube, youtubeBlockedUntil } from './services/youtube';
 
 /* ---------------- validation schemas ---------------- */
 
@@ -30,11 +30,34 @@ function warmStreams(ids: string[]) {
   for (const id of ids) youtube.streamUrl(id).catch(() => null);
 }
 
-router.get('/health', (_req, res) => res.json({ status: 'ok', ai: aiEnabled(), aiPausedUntil: aiPausedUntil(), time: new Date().toISOString() }));
+router.get('/health', (_req, res) =>
+  res.json({ status: 'ok', ai: aiEnabled(), aiPausedUntil: aiPausedUntil(), youtubeBlockedUntil: youtubeBlockedUntil(), time: new Date().toISOString() }),
+);
 
 /* ---------------- auth ---------------- */
 
-router.post('/auth/register', handler(async (req, res) => {
+/** Per-IP fixed-window limiter for credential endpoints (blocks password guessing). */
+function rateLimit(max: number, windowMs: number): RequestHandler {
+  const hits = new Map<string, { count: number; reset: number }>();
+  return (req, res, next) => {
+    const key = req.ip ?? 'unknown';
+    const now = Date.now();
+    const entry = hits.get(key);
+    if (!entry || entry.reset < now) {
+      hits.set(key, { count: 1, reset: now + windowMs });
+      if (hits.size > 10_000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
+      return next();
+    }
+    if (++entry.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.reset - now) / 1000)));
+      return res.status(429).json({ message: 'Trop de tentatives, réessaie dans quelques minutes' });
+    }
+    next();
+  };
+}
+const authLimit = rateLimit(10, 10 * 60 * 1000);
+
+router.post('/auth/register', authLimit, handler(async (req, res) => {
   const body = z.object({
     email: z.string().trim().email('email invalide'),
     password: z.string().min(8, 'au moins 8 caractères').max(128),
@@ -43,7 +66,7 @@ router.post('/auth/register', handler(async (req, res) => {
   res.status(201).json(await auth.register(body.email, body.password, body.displayName));
 }));
 
-router.post('/auth/login', handler(async (req, res) => {
+router.post('/auth/login', authLimit, handler(async (req, res) => {
   const body = z.object({ email: z.string().trim().email('email invalide'), password: z.string().min(1).max(128) }).parse(req.body);
   res.json(await auth.login(body.email, body.password));
 }));
@@ -63,11 +86,11 @@ router.post('/auth/logout', authenticate, handler(async (req, res) => {
 
 /* ---------------- catalogue (public) ---------------- */
 
-router.get('/search', handler(async (req, res) => {
+router.get('/search', authenticate, handler(async (req, res) => {
   const { q, limit } = z.object({ q: z.string().trim().max(150).default(''), limit: z.coerce.number().int().min(1).max(40).default(24) }).parse(req.query);
   const songs = q ? await youtube.search(q, limit) : [];
   res.json({ songs });
-  warmStreams(songs.slice(0, 2).map((s) => s.id));
+  warmStreams(songs.slice(0, 1).map((s) => s.id));
 }));
 
 const thumbCache = new TTLCache<{ type: string; body: Buffer }>(24 * 3600 * 1000, 600);
@@ -160,10 +183,20 @@ router.get('/stream/:id', handler(async (req, res) => {
   try {
     while (pos <= range.end && !controller.signal.aborted) {
       const to = Math.min(pos + SLICE - 1, range.end);
-      const slice = first ?? (await fetchSlice(pos, to));
-      first = null;
-      for await (const chunk of Readable.fromWeb(slice.body as any)) {
-        if (!res.write(chunk)) await new Promise((r) => res.once('drain', r));
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const slice = first ?? (await fetchSlice(pos, to));
+          first = null;
+          for await (const chunk of Readable.fromWeb(slice.body as any)) {
+            pos += (chunk as Buffer).length;
+            if (!res.write(chunk)) await new Promise((r) => res.once('drain', r));
+          }
+          break;
+        } catch (err) {
+          // A dropped upstream connection mid-slice: resume once from the last byte sent.
+          first = null;
+          if (controller.signal.aborted || attempt >= 1) throw err;
+        }
       }
       pos = to + 1;
     }
