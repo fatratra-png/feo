@@ -1,122 +1,220 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { libraryApi } from '../lib/api';
-import { formatDuration } from '../lib/utils';
-import { usePlayerStore } from '../stores/playerStore';
+import { Ionicons } from '@expo/vector-icons';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useState } from 'react';
+import { RefreshControl, ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CardRow, MixCard, PlaylistCard, QuickTile, SectionGap } from '../components/song';
+import { Sheet } from '../components/sheets';
+import { Button, Chip, ErrorState, IconButton, Logo, Press, SectionTitle, Skeleton, T } from '../components/ui';
+import { api } from '../lib/api';
+import { greeting } from '../lib/format';
+import type { Mix } from '../lib/types';
+import { useAuthStore } from '../stores/auth';
+import { usePlayerStore } from '../stores/player';
+import { toast } from '../stores/ui';
+import { useTheme, type ThemePref } from '../theme/ThemeProvider';
+import { font, radius } from '../theme/tokens';
 
-const COLORS = ['#FFD700', '#FF6B9D', '#0057FF', '#00D68F', '#B366FF', '#FF9500', '#FF3B30', '#00C7BE'];
+const PROMPTS = ['Afro chill pour un dimanche', 'Hira gasy classiques', 'Motivation sport', 'R&B des années 2000'];
 
-export function HomeScreen({ navigation }: any) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const { play } = usePlayerStore();
-
-  useEffect(() => {
-    libraryApi.getHome().then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#FFD700" /></View>;
-
+function AccountSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const { pref, setPref, c } = useTheme();
+  const { user, logout } = useAuthStore();
+  const options: { value: ThemePref; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
+    { value: 'light', label: 'Clair', icon: 'sunny-outline' },
+    { value: 'dark', label: 'Sombre', icon: 'moon-outline' },
+    { value: 'system', label: 'Système', icon: 'phone-portrait-outline' },
+  ];
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoChar}>F</Text>
-          </View>
-          <Text style={styles.logo}>
-            <Text style={{ color: '#FFD700' }}>F</Text>
-            <Text style={{ color: '#FF6B9D' }}>E</Text>
-            <Text style={{ color: '#0057FF' }}>O</Text>
-            <Text style={{ color: '#FF3B30' }}>.</Text>
-          </Text>
+    <Sheet visible={visible} onClose={onClose} title={user?.displayName ?? 'Compte'}>
+      <View style={{ paddingHorizontal: 20, gap: 16, paddingBottom: 8 }}>
+        <T tone="fg2" size={13}>{user?.email}</T>
+        <T size={14} weight="700">Thème</T>
+        <View style={{ flexDirection: 'row', gap: 8 }} accessibilityRole="radiogroup">
+          {options.map((o) => (
+            <Press
+              key={o.value}
+              onPress={() => setPref(o.value)}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: pref === o.value }}
+              style={{ flex: 1, alignItems: 'center', gap: 6, paddingVertical: 14, borderRadius: radius.md, backgroundColor: pref === o.value ? c.accent : c.overlay }}
+            >
+              <Ionicons name={o.icon} size={20} color={pref === o.value ? c.onAccent : c.fg} />
+              <T size={13} weight="700" tone={pref === o.value ? 'onAccent' : 'fg'}>{o.label}</T>
+            </Press>
+          ))}
         </View>
-        <Text style={styles.logoSub}>Henoy ara</Text>
+        <Button
+          label="Se déconnecter"
+          variant="secondary"
+          icon="log-out-outline"
+          onPress={() => { onClose(); usePlayerStore.setState({ isPlaying: false, queue: [], index: -1 }); void logout(); }}
+        />
       </View>
-
-      {data?.recentlyPlayed?.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionNumber}><Text style={styles.sectionNumberText}>01</Text></View>
-            <Text style={styles.sectionTitle}>Recently Played</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.horizontalScroll}>
-            {data.recentlyPlayed.slice(0, 8).map((item: any, i: number) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[styles.horizontalCard, { borderColor: COLORS[i % COLORS.length] }]}
-                onPress={() => play(item)}
-              >
-                <Image source={{ uri: item.album_cover_url }} style={styles.thumbnail} />
-                <Text style={styles.trackTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.metadata}>{formatDuration(item.duration)}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {data?.topTracks?.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionNumber, { backgroundColor: '#FF6B9D' }]}><Text style={styles.sectionNumberText}>02</Text></View>
-            <Text style={styles.sectionTitle}>Top Tracks</Text>
-            <Text style={styles.metadata}>{data.topTracks.length}</Text>
-          </View>
-          {data.topTracks.slice(0, 10).map((track: any, i: number) => {
-            const isActive = i === 0;
-            return (
-              <TouchableOpacity
-                key={track.id}
-                style={[styles.trackRow, isActive && styles.trackRowActive]}
-                onPress={() => play(track)}
-              >
-                <View style={[styles.indexBox, { backgroundColor: COLORS[i % COLORS.length] }]}>
-                  <Text style={styles.indexText}>{String(i + 1).padStart(2, '0')}</Text>
-                </View>
-                <Image source={{ uri: track.album_cover_url }} style={styles.smallThumb} />
-                <View style={styles.trackInfo}>
-                  <Text style={styles.trackTitle} numberOfLines={1}>{track.title}</Text>
-                  <Text style={styles.artistName}>{track.artist_name}</Text>
-                </View>
-                <Text style={styles.metadata}>{formatDuration(track.duration)}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </ScrollView>
+    </Sheet>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  content: { padding: 20, paddingBottom: 120 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
-  header: { marginBottom: 28 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoBox: { width: 36, height: 36, borderWidth: 2, borderColor: '#333', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFD700', transform: [{ rotate: '-3deg' }] },
-  logoChar: { fontSize: 20, fontWeight: '900', color: '#000' },
-  logo: { fontSize: 36, fontWeight: '900', letterSpacing: -2 },
-  logoSub: { fontSize: 9, fontFamily: 'monospace', color: '#e0d8c8', opacity: 0.3, letterSpacing: 3, marginTop: 4, marginLeft: 4 },
+async function playMix(mix: Mix) {
+  const p = usePlayerStore.getState();
+  if (p.context?.label === mix.title) return p.togglePlay();
+  try {
+    const { songs } = await api.mix(mix.id);
+    if (!songs.length) return toast('Ce mix est vide pour le moment', { tone: 'error' });
+    p.playSongs(songs, 0, { label: mix.title });
+  } catch (err) {
+    toast((err as Error).message, { tone: 'error' });
+  }
+}
 
-  section: { marginBottom: 32 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  sectionNumber: { width: 32, height: 32, borderWidth: 2, borderColor: '#333', backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center', shadowColor: '#222', shadowOffset: { width: 3, height: 3 }, shadowOpacity: 1, shadowRadius: 0 },
-  sectionNumberText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '900', color: '#000' },
-  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#e0d8c8', textTransform: 'uppercase', letterSpacing: 0.5 },
-  horizontalScroll: { marginLeft: -4, marginBottom: 4 },
+export function HomeScreen({ navigation }: any) {
+  const { c, name } = useTheme();
+  const insets = useSafeAreaInsets();
+  const user = useAuthStore((s) => s.user);
+  const qc = useQueryClient();
+  const [account, setAccount] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const currentId = usePlayerStore((s) => s.queue[s.index]?.id);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
 
-  horizontalCard: { width: 150, marginRight: 12, borderWidth: 2, borderColor: '#333', backgroundColor: '#1e1e1e', padding: 8, shadowColor: '#222', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  thumbnail: { width: '100%', height: 130, borderWidth: 2, borderColor: '#333', marginBottom: 8, backgroundColor: '#2a2a2a' },
+  const { data, isLoading, error, refetch, isRefetching } = useQuery({
+    queryKey: ['home'],
+    queryFn: api.home,
+    refetchInterval: (q) => (q.state.data?.aiPending ? 8000 : false),
+  });
 
-  trackRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: '#333', backgroundColor: '#1e1e1e', padding: 12, marginBottom: 6, shadowColor: '#222', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  trackRowActive: { borderColor: '#FFD700', backgroundColor: '#FFD700' },
-  indexBox: { width: 32, height: 32, borderWidth: 1.5, borderColor: '#333', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  indexText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '900', color: '#000' },
-  smallThumb: { width: 40, height: 40, borderWidth: 1.5, borderColor: '#333', marginRight: 10, backgroundColor: '#2a2a2a' },
-  trackInfo: { flex: 1, marginRight: 8 },
-  trackTitle: { fontWeight: '700', fontSize: 13, color: '#e0d8c8' },
-  artistName: { fontSize: 11, fontFamily: 'monospace', color: '#e0d8c8', opacity: 0.5, marginTop: 2 },
-  metadata: { fontFamily: 'monospace', fontSize: 10, color: '#e0d8c8', opacity: 0.4, borderWidth: 1, borderColor: '#444', paddingHorizontal: 6, paddingVertical: 2 },
-});
+  const regenerate = useMutation({
+    mutationFn: api.refreshHome,
+    onSuccess: () => { toast("L'IA recompose tes mix, environ une minute"); setTimeout(() => qc.invalidateQueries({ queryKey: ['home'] }), 8000); },
+    onError: (err: Error) => toast(err.message, { tone: 'error' }),
+  });
+
+  const goCreate = (p: string) => p.trim() && navigation.navigate('Create', { prompt: p.trim() });
+  const isNew = data && data.recent.length === 0;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <ScrollView refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => { void refetch(); }} tintColor={c.fg2} />} contentContainerStyle={{ paddingBottom: 24 }}>
+        <LinearGradient colors={[name === 'dark' ? '#4a3d0c' : '#fbe58a', c.bg]} style={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Logo size={28} />
+            <Press onPress={() => setAccount(true)} accessibilityRole="button" accessibilityLabel="Compte et thème" style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: c.accent, alignItems: 'center', justifyContent: 'center' }}>
+              <T size={15} weight="900" tone="onAccent">{user?.displayName?.[0]?.toUpperCase() ?? '?'}</T>
+            </Press>
+          </View>
+          <T size={30} style={[font.display, { marginTop: 22 }]} accessibilityRole="header">{greeting()}, {user?.displayName.split(' ')[0]}</T>
+          <T tone="fg2" size={14} style={{ marginTop: 4 }}>{isNew ? 'Lance quelques titres : FEO apprend tes goûts.' : 'Que veux-tu écouter aujourd’hui ?'}</T>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 18, backgroundColor: c.surface, borderRadius: radius.full, paddingLeft: 16, paddingRight: 4, height: 50 }}>
+            <Ionicons name="sparkles" size={18} color={c.accentFg} />
+            <TextInput
+              value={prompt}
+              onChangeText={setPrompt}
+              onSubmitEditing={() => goCreate(prompt)}
+              placeholder="Décris ce que tu veux écouter…"
+              placeholderTextColor={c.fg3}
+              returnKeyType="go"
+              accessibilityLabel="Décris ce que tu veux écouter"
+              style={{ flex: 1, color: c.fg, fontSize: 15 }}
+            />
+            <IconButton icon="arrow-forward-circle" size={34} color={c.accentFg} label="Créer la playlist" disabled={!prompt.trim()} onPress={() => goCreate(prompt)} />
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 12 }}>
+            {PROMPTS.map((p) => <Chip key={p} label={p} onPress={() => goCreate(p)} />)}
+          </ScrollView>
+        </LinearGradient>
+
+        <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          {error ? (
+            <ErrorState message={(error as Error).message} onRetry={refetch} />
+          ) : isLoading || !data ? (
+            <View style={{ gap: 10 }}>
+              {[0, 1, 2].map((i) => <View key={i} style={{ flexDirection: 'row', gap: 8 }}><Skeleton style={{ flex: 1, height: 56 }} /><Skeleton style={{ flex: 1, height: 56 }} /></View>)}
+            </View>
+          ) : (
+            <>
+              {data.aiPausedUntil && (
+                <View style={{ flexDirection: 'row', gap: 10, padding: 14, borderRadius: radius.md, backgroundColor: c.overlay, marginBottom: 20 }}>
+                  <Ionicons name="moon-outline" size={16} color={c.fg2} />
+                  <T tone="fg2" size={13} style={{ flex: 1 }}>
+                    L'IA se repose jusqu'à {new Date(data.aiPausedUntil).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} (quota du jour). La musique continue normalement.
+                  </T>
+                </View>
+              )}
+
+              {data.recent.length > 0 && (
+                <>
+                  <View style={{ gap: 8 }}>
+                    {Array.from({ length: Math.ceil(Math.min(6, data.recent.length) / 2) }, (_, r) => (
+                      <View key={r} style={{ flexDirection: 'row', gap: 8 }}>
+                        {data.recent.slice(r * 2, r * 2 + 2).map((song, k) => (
+                          <QuickTile
+                            key={song.id}
+                            song={song}
+                            active={song.id === currentId}
+                            playing={isPlaying}
+                            onPress={() => {
+                              const p = usePlayerStore.getState();
+                              song.id === currentId ? p.togglePlay() : p.playSongs(data.recent, r * 2 + k, { label: 'Écoutés récemment' });
+                            }}
+                          />
+                        ))}
+                        {data.recent.slice(r * 2, r * 2 + 2).length === 1 && <View style={{ flex: 1 }} />}
+                      </View>
+                    ))}
+                  </View>
+                  <SectionGap />
+                </>
+              )}
+
+              <SectionTitle
+                title={data.aiReady ? 'Pour toi' : isNew ? 'Pour commencer' : 'Tes mix'}
+                subtitle={data.aiReady ? 'Composés par l’IA à partir de tes écoutes' : data.aiPending ? 'L’IA prépare des mix personnalisés…' : undefined}
+                action={data.aiEnabled && !data.aiPausedUntil && data.topArtists.length > 0 && !data.aiPending ? (
+                  <IconButton icon="refresh" label="Régénérer les mix" onPress={() => regenerate.mutate()} disabled={regenerate.isPending} />
+                ) : undefined}
+              />
+              <CardRow>
+                {data.aiPending && (
+                  <View style={{ width: 150 }} accessibilityLabel="L'IA compose tes mix">
+                    <View style={{ aspectRatio: 1, borderRadius: radius.sm, borderWidth: 1, borderStyle: 'dashed', borderColor: c.accentFg, alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="sparkles" size={30} color={c.accentFg} />
+                    </View>
+                    <T size={14} weight="700" style={{ marginTop: 8 }}>L'IA compose…</T>
+                  </View>
+                )}
+                {data.mixes.map((m) => (
+                  <MixCard key={m.id} mix={m} onPress={() => navigation.navigate('Mix', { id: m.id, title: m.title, subtitle: m.subtitle })} />
+                ))}
+              </CardRow>
+
+              {data.playlists.length > 0 && (
+                <>
+                  <SectionGap />
+                  <SectionTitle title="Tes playlists" />
+                  <CardRow>
+                    {data.playlists.map((p) => <PlaylistCard key={p.id} playlist={p} onPress={() => navigation.navigate('Playlist', { id: p.id })} />)}
+                  </CardRow>
+                </>
+              )}
+
+              {data.topArtists.length > 0 && (
+                <>
+                  <SectionGap />
+                  <SectionTitle title="Tes artistes du moment" />
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    {data.topArtists.map((a) => <Chip key={a.name} label={a.name} onPress={() => navigation.navigate('Search', { q: a.name })} />)}
+                  </View>
+                </>
+              )}
+            </>
+          )}
+        </View>
+      </ScrollView>
+      <AccountSheet visible={account} onClose={() => setAccount(false)} />
+    </View>
+  );
+}
+
+export { playMix };

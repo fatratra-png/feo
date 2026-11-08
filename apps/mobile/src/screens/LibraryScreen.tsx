@@ -1,105 +1,90 @@
-import { useEffect, useState } from 'react';
-import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { libraryApi } from '../lib/api';
-import { formatDuration } from '../lib/utils';
-import { usePlayerStore } from '../stores/playerStore';
+import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CreatePlaylistSheet } from '../components/sheets';
+import { LikedTile, SongList } from '../components/song';
+import { Chip, EmptyState, ErrorState, IconButton, Mosaic, Press, SongListSkeleton, T } from '../components/ui';
+import { useLikedIds, usePlaylists } from '../hooks/library';
+import { api } from '../lib/api';
+import { useTheme } from '../theme/ThemeProvider';
+import { font } from '../theme/tokens';
 
-const COLORS = ['#FFD700', '#FF6B9D', '#0057FF', '#00D68F', '#B366FF', '#FF9500', '#FF3B30', '#00C7BE'];
-
-export function LibraryScreen({ navigation }: any) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const { play } = usePlayerStore();
-
-  useEffect(() => {
-    libraryApi.getLibrary().then(setData).catch(() => {}).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#FFD700" /></View>;
-
+function Row({ cover, title, subtitle, onPress }: { cover: React.ReactNode; title: string; subtitle: string; onPress: () => void }) {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoBox}><Text style={styles.logoIcon}>&#9776;</Text></View>
-          <Text style={styles.logo}>Your Library</Text>
-        </View>
-        <Text style={styles.logoSub}>All your music</Text>
+    <Press onPress={onPress} accessibilityRole="button" accessibilityLabel={`${title}, ${subtitle}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 }}>
+      {cover}
+      <View style={{ flex: 1 }}>
+        <T numberOfLines={1} size={15} weight="600">{title}</T>
+        <T numberOfLines={1} tone="fg2" size={13} style={{ marginTop: 2 }}>{subtitle}</T>
       </View>
-
-      {data?.playlists?.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionNum, { backgroundColor: '#FFD700' }]}><Text style={styles.sectionNumText}>01</Text></View>
-            <Text style={styles.sectionTitle}>Playlists</Text>
-            <Text style={styles.metadata}>{data.playlists.length}</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {data.playlists.map((p: any, i: number) => (
-              <TouchableOpacity
-                key={p.id}
-                style={[styles.card, { borderColor: COLORS[i % COLORS.length] }]}
-                onPress={() => navigation.navigate('PlaylistDetail', { id: p.id })}
-              >
-                <Image source={{ uri: p.cover_url }} style={styles.albumArt} />
-                <Text style={styles.cardTitle} numberOfLines={1}>{p.name}</Text>
-                <Text style={styles.metadata}>{p.tracks_count} tracks</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {data?.likedTracks?.length > 0 && (
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={[styles.sectionNum, { backgroundColor: '#FF6B9D' }]}><Text style={styles.sectionNumText}>02</Text></View>
-            <Text style={styles.sectionTitle}>Liked Tracks</Text>
-            <Text style={styles.metadata}>{data.likedTracks.length}</Text>
-          </View>
-          {data.likedTracks.map((track: any, i: number) => (
-            <TouchableOpacity key={track.id} style={styles.trackRow} onPress={() => play(track)}>
-              <View style={[styles.indexBox, { backgroundColor: COLORS[i % COLORS.length] }]}>
-                <Text style={styles.indexText}>{String(i + 1).padStart(2, '0')}</Text>
-              </View>
-              <Image source={{ uri: track.album_cover_url }} style={styles.smallThumb} />
-              <View style={styles.trackInfo}>
-                <Text style={styles.trackTitle} numberOfLines={1}>{track.title}</Text>
-                <Text style={styles.artistName}>{track.artist_name}</Text>
-              </View>
-              <Text style={styles.metadata}>{formatDuration(track.duration)}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-    </ScrollView>
+    </Press>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  content: { padding: 20, paddingBottom: 120 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' },
-  header: { marginBottom: 28 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoBox: { width: 36, height: 36, borderWidth: 2, borderColor: '#333', backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
-  logoIcon: { fontSize: 18, color: '#000', fontWeight: '900' },
-  logo: { fontSize: 28, fontWeight: '900', color: '#e0d8c8', letterSpacing: -1, textTransform: 'uppercase' },
-  logoSub: { fontSize: 9, fontFamily: 'monospace', color: '#e0d8c8', opacity: 0.3, letterSpacing: 2, marginLeft: 46, marginTop: -2 },
-  section: { marginBottom: 28 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  sectionNum: { width: 32, height: 32, borderWidth: 2, borderColor: '#333', justifyContent: 'center', alignItems: 'center' },
-  sectionNumText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '900', color: '#000' },
-  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#e0d8c8', textTransform: 'uppercase', letterSpacing: 0.5 },
-  card: { width: 150, marginRight: 12, borderWidth: 2, borderColor: '#333', backgroundColor: '#1e1e1e', padding: 8, shadowColor: '#222', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  albumArt: { width: '100%', height: 130, borderWidth: 2, borderColor: '#333', marginBottom: 8, backgroundColor: '#2a2a2a' },
-  cardTitle: { fontWeight: '700', fontSize: 12, color: '#e0d8c8' },
-  trackRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: '#333', backgroundColor: '#1e1e1e', padding: 12, marginBottom: 6, shadowColor: '#222', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  indexBox: { width: 32, height: 32, borderWidth: 1.5, borderColor: '#333', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  indexText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '900', color: '#000' },
-  smallThumb: { width: 40, height: 40, borderWidth: 1.5, borderColor: '#333', marginRight: 10, backgroundColor: '#2a2a2a' },
-  trackInfo: { flex: 1, marginRight: 8 },
-  trackTitle: { fontWeight: '700', fontSize: 13, color: '#e0d8c8' },
-  artistName: { fontSize: 11, fontFamily: 'monospace', color: '#e0d8c8', opacity: 0.5, marginTop: 2 },
-  metadata: { fontFamily: 'monospace', fontSize: 10, color: '#e0d8c8', opacity: 0.4, borderWidth: 1, borderColor: '#444', paddingHorizontal: 6, paddingVertical: 2 },
-});
+function History() {
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ['history'], queryFn: api.history });
+  if (error) return <ErrorState message={(error as Error).message} onRetry={refetch} />;
+  if (isLoading) return <SongListSkeleton />;
+  if (!data?.songs.length) return <EmptyState icon="time-outline" title="Rien écouté pour l'instant" body="Tes écoutes apparaîtront ici." />;
+  return <SongList songs={data.songs} context={{ label: 'Écoutés récemment' }} />;
+}
+
+export function LibraryScreen({ navigation }: any) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState<'playlists' | 'history'>('playlists');
+  const [creating, setCreating] = useState(false);
+  const { data: playlists, isLoading, error, refetch } = usePlaylists();
+  const likedCount = useLikedIds().size;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top + 8 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+        <T size={28} style={font.display} accessibilityRole="header">Bibliothèque</T>
+        <View style={{ flexDirection: 'row' }}>
+          <IconButton icon="sparkles-outline" label="Créer avec l'IA" onPress={() => navigation.navigate('Create')} />
+          <IconButton icon="add" size={28} label="Nouvelle playlist" onPress={() => setCreating(true)} />
+        </View>
+      </View>
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 10, marginBottom: 6 }} accessibilityRole="tablist">
+        <Chip label="Playlists" active={tab === 'playlists'} onPress={() => setTab('playlists')} />
+        <Chip label="Historique" active={tab === 'history'} onPress={() => setTab('history')} />
+      </View>
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+        {tab === 'history' ? (
+          <History />
+        ) : error ? (
+          <ErrorState message={(error as Error).message} onRetry={refetch} />
+        ) : isLoading ? (
+          <SongListSkeleton rows={5} />
+        ) : (
+          <>
+            <Row cover={<LikedTile size={56} />} title="Titres likés" subtitle={`Playlist · ${likedCount} titre${likedCount > 1 ? 's' : ''}`} onPress={() => navigation.navigate('Liked')} />
+            {playlists?.map((p) => (
+              <Row
+                key={p.id}
+                cover={<Mosaic ids={p.coverIds} size={56} />}
+                title={p.name}
+                subtitle={`${p.aiPrompt ? 'Créée par l’IA' : 'Playlist'} · ${p.songCount} titre${p.songCount > 1 ? 's' : ''}`}
+                onPress={() => navigation.navigate('Playlist', { id: p.id })}
+              />
+            ))}
+            {playlists?.length === 0 && (
+              <View style={{ marginTop: 20, padding: 16, borderRadius: 12, backgroundColor: c.overlay, gap: 8 }}>
+                <T size={15} weight="700">Crée ta première playlist</T>
+                <T tone="fg2" size={13}>Ou décris une ambiance et laisse l'IA la composer.</T>
+                <Press onPress={() => navigation.navigate('Create')} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  <Ionicons name="sparkles" size={16} color={c.accentFg} />
+                  <T tone="accentFg" size={14} weight="700">Créer avec l'IA</T>
+                </Press>
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
+      <CreatePlaylistSheet visible={creating} onClose={() => setCreating(false)} />
+    </View>
+  );
+}

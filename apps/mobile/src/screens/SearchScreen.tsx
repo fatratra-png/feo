@@ -1,97 +1,146 @@
-import { useState } from 'react';
-import { View, Text, TextInput, ScrollView, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { searchApi } from '../lib/api';
-import { formatDuration } from '../lib/utils';
-import { usePlayerStore } from '../stores/playerStore';
+import { Ionicons } from '@expo/vector-icons';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
+import { ScrollView, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SongList } from '../components/song';
+import { Button, EmptyState, ErrorState, IconButton, Press, SectionTitle, SongListSkeleton, T } from '../components/ui';
+import { ApiError, api } from '../lib/api';
+import { usePlayerStore } from '../stores/player';
+import { useTheme } from '../theme/ThemeProvider';
+import { font, radius } from '../theme/tokens';
 
-const COLORS = ['#FFD700', '#FF6B9D', '#0057FF', '#00D68F', '#B366FF', '#FF9500', '#FF3B30', '#00C7BE'];
+const GENRES = [
+  { label: 'Gasy', q: 'musique malagasy hits', colors: '#c2410c' },
+  { label: 'Afrobeats', q: 'afrobeats hits', colors: '#b45309' },
+  { label: 'Hip-hop', q: 'hip hop hits', colors: '#4338ca' },
+  { label: 'R&B', q: 'rnb soul hits', colors: '#9d174d' },
+  { label: 'Pop', q: 'pop hits official audio', colors: '#0e7490' },
+  { label: 'Amapiano', q: 'amapiano hits', colors: '#047857' },
+  { label: 'Gospel', q: 'gospel malagasy', colors: '#a16207' },
+  { label: 'Zouk & Kompa', q: 'zouk kompa hits', colors: '#be123c' },
+];
 
-export function SearchScreen({ navigation }: any) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const { play } = usePlayerStore();
+const looksLikeDescription = (q: string) => q.trim().split(/\s+/).length >= 5 || /\b(qui|comme|chanson|ambiance|années)\b/i.test(q);
 
-  const handleSearch = async (text: string) => {
-    setQuery(text);
-    if (text.length === 0) { setResults(null); return; }
-    setLoading(true);
-    try {
-      const data = await searchApi.search(text);
-      setResults(data);
-    } catch {} finally {
-      setLoading(false);
-    }
-  };
+export function SearchScreen({ route, navigation }: any) {
+  const { c } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [input, setInput] = useState('');
+  const [q, setQ] = useState('');
+  const [ai, setAi] = useState(false);
+
+  // Deep link from "More from <artist>" / artist chips.
+  useEffect(() => {
+    const param = route.params?.q;
+    if (param) { setInput(param); setQ(param); setAi(false); navigation.setParams({ q: undefined }); }
+  }, [route.params?.q]);
+
+  // Debounced classic search while typing.
+  useEffect(() => {
+    if (ai) return;
+    const t = setTimeout(() => setQ(input.trim()), 450);
+    return () => clearTimeout(t);
+  }, [input, ai]);
+
+  const classic = useQuery({ queryKey: ['search', q], queryFn: () => api.search(q), enabled: !ai && q.length > 0, staleTime: 10 * 60_000 });
+  const smart = useQuery({
+    queryKey: ['smart-search', q],
+    queryFn: async () => {
+      try {
+        return { ...(await api.smartSearch(q)), fallback: false as const, reason: '' };
+      } catch (err) {
+        if (err instanceof ApiError && (err.status === 503 || err.status === 429)) {
+          return { interpretation: '', songs: (await api.search(q)).songs, model: '', fallback: true as const, reason: err.message };
+        }
+        throw err;
+      }
+    },
+    enabled: ai && q.length >= 3,
+    retry: false,
+    staleTime: 30 * 60_000,
+  });
+  const active = ai ? smart : classic;
+  const songs = active.data?.songs ?? [];
+  const context = useMemo(() => ({ label: `Recherche « ${q} »` }), [q]);
+
+  const runAi = () => { if (input.trim().length >= 3) { setAi(true); setQ(input.trim()); } };
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.logoRow}>
-          <View style={styles.logoBox}><Text style={styles.logoIcon}>&#8999;</Text></View>
-          <Text style={styles.logo}>Search</Text>
+    <View style={{ flex: 1, backgroundColor: c.bg, paddingTop: insets.top + 8 }}>
+      <View style={{ paddingHorizontal: 16, paddingBottom: 10 }}>
+        <T size={28} style={font.display} accessibilityRole="header">Rechercher</T>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12, backgroundColor: c.surface, borderRadius: radius.md, paddingLeft: 12, height: 48, borderWidth: ai ? 1.5 : 0, borderColor: c.accentFg }}>
+          <Ionicons name={ai ? 'sparkles' : 'search'} size={18} color={ai ? c.accentFg : c.fg2} />
+          <TextInput
+            value={input}
+            onChangeText={(v) => { setInput(v); if (ai && !v) setAi(false); }}
+            onSubmitEditing={() => (ai || looksLikeDescription(input) ? runAi() : setQ(input.trim()))}
+            placeholder={ai ? 'Décris la chanson ou l’ambiance…' : 'Titres, artistes…'}
+            placeholderTextColor={c.fg3}
+            returnKeyType="search"
+            autoCorrect={false}
+            accessibilityLabel="Rechercher"
+            style={{ flex: 1, color: c.fg, fontSize: 16 }}
+          />
+          {input ? <IconButton icon="close" size={18} label="Effacer" onPress={() => { setInput(''); setQ(''); setAi(false); }} /> : null}
         </View>
-        <Text style={styles.logoSub}>Millions of songs</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+          <Press
+            onPress={() => (ai ? (setAi(false), setQ(input.trim())) : runAi())}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: ai }}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 34, borderRadius: radius.full, backgroundColor: ai ? c.accent : c.overlay }}
+          >
+            <Ionicons name="sparkles" size={14} color={ai ? c.onAccent : c.fg} />
+            <T size={13} weight="700" tone={ai ? 'onAccent' : 'fg'}>{ai ? 'Recherche IA' : 'Demander à l’IA'}</T>
+          </Press>
+        </View>
       </View>
-      <TextInput
-        style={styles.input}
-        placeholder="Search artists, albums, tracks..."
-        placeholderTextColor="#666"
-        value={query}
-        onChangeText={handleSearch}
-      />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {loading && <ActivityIndicator style={{ marginTop: 20 }} color="#FFD700" />}
-
-        {results?.tracks?.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={[styles.sectionNum, { backgroundColor: '#FFD700' }]}><Text style={styles.sectionNumText}>01</Text></View>
-              <Text style={styles.sectionTitle}>Tracks</Text>
-              <Text style={styles.metadata}>{results.tracks.length}</Text>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}>
+        {!q ? (
+          <>
+            <SectionTitle title="Parcourir" />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {GENRES.map((g) => (
+                <Press
+                  key={g.label}
+                  onPress={() => { setAi(false); setInput(g.label); setQ(g.q); }}
+                  accessibilityRole="button"
+                  style={{ width: '48%', flexGrow: 1, height: 96, borderRadius: radius.md, backgroundColor: g.colors, padding: 14, overflow: 'hidden' }}
+                >
+                  <T size={18} weight="800" style={{ color: '#fff' }}>{g.label}</T>
+                  <View style={{ position: 'absolute', right: -14, bottom: -14, width: 64, height: 64, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.18)', transform: [{ rotate: '20deg' }] }} />
+                </Press>
+              ))}
             </View>
-            {results.tracks.map((track: any, i: number) => (
-              <TouchableOpacity key={track.id} style={styles.trackRow} onPress={() => play(track)}>
-                <View style={[styles.indexBox, { backgroundColor: COLORS[i % COLORS.length] }]}>
-                  <Text style={styles.indexText}>{String(i + 1).padStart(2, '0')}</Text>
-                </View>
-                <Image source={{ uri: track.album_cover_url }} style={styles.smallThumb} />
-                <View style={styles.trackInfo}>
-                  <Text style={styles.trackTitle} numberOfLines={1}>{track.title}</Text>
-                  <Text style={styles.artistName}>{track.artist_name}</Text>
-                </View>
-                <Text style={styles.metadata}>{formatDuration(track.duration)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          </>
+        ) : active.isLoading ? (
+          <>
+            {ai && <T tone="fg2" size={13} style={{ marginVertical: 8 }}><Ionicons name="sparkles" size={13} color={c.accentFg} /> L'IA réfléchit à ta description…</T>}
+            <SongListSkeleton />
+          </>
+        ) : active.error ? (
+          <ErrorState message={(active.error as Error).message} onRetry={() => active.refetch()} />
+        ) : songs.length === 0 ? (
+          <EmptyState icon="search" title={`Aucun résultat pour « ${q} »`} body="Vérifie l'orthographe ou décris la chanson autrement." action={!ai ? <Button label="Demander à l'IA" variant="primary" icon="sparkles" onPress={runAi} /> : undefined} />
+        ) : (
+          <>
+            {ai && smart.data && (smart.data.fallback ? (
+              <View style={{ padding: 12, borderRadius: radius.md, backgroundColor: c.overlay, marginBottom: 12 }}>
+                <T tone="fg2" size={13}>{smart.data.reason || 'IA indisponible'} — résultats d'une recherche classique.</T>
+              </View>
+            ) : smart.data.interpretation ? (
+              <View style={{ padding: 12, borderRadius: radius.md, backgroundColor: c.overlay, marginBottom: 12, gap: 4 }}>
+                <T tone="accentFg" size={11} weight="800" style={{ textTransform: 'uppercase' }}>Ce que l'IA a compris</T>
+                <T size={14}>{smart.data.interpretation}</T>
+              </View>
+            ) : null)}
+            <SongList songs={songs} context={context} showReason={ai} onPlay={(i) => usePlayerStore.getState().playSongs(songs, i, context)} />
+          </>
         )}
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#121212' },
-  content: { padding: 20, paddingBottom: 120 },
-  header: { padding: 20, paddingBottom: 0 },
-  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoBox: { width: 36, height: 36, borderWidth: 2, borderColor: '#333', backgroundColor: '#FFD700', justifyContent: 'center', alignItems: 'center' },
-  logoIcon: { fontSize: 18, color: '#000', fontWeight: '900' },
-  logo: { fontSize: 28, fontWeight: '900', color: '#e0d8c8', letterSpacing: -1, textTransform: 'uppercase' },
-  logoSub: { fontSize: 9, fontFamily: 'monospace', color: '#e0d8c8', opacity: 0.3, letterSpacing: 2, marginLeft: 46, marginTop: -2 },
-  input: { marginHorizontal: 20, marginTop: 16, borderWidth: 3, borderColor: '#444', padding: 16, fontSize: 16, backgroundColor: '#2a2a2a', color: '#e0d8c8', shadowColor: '#222', shadowOffset: { width: 5, height: 5 }, shadowOpacity: 1, shadowRadius: 0 },
-  section: { marginTop: 28 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  sectionNum: { width: 32, height: 32, borderWidth: 2, borderColor: '#333', justifyContent: 'center', alignItems: 'center' },
-  sectionNumText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '900', color: '#000' },
-  sectionTitle: { fontSize: 16, fontWeight: '900', color: '#e0d8c8', textTransform: 'uppercase', letterSpacing: 0.5 },
-  trackRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 2, borderColor: '#333', backgroundColor: '#1e1e1e', padding: 12, marginBottom: 6, shadowColor: '#222', shadowOffset: { width: 4, height: 4 }, shadowOpacity: 1, shadowRadius: 0 },
-  indexBox: { width: 32, height: 32, borderWidth: 1.5, borderColor: '#333', justifyContent: 'center', alignItems: 'center', marginRight: 10 },
-  indexText: { fontFamily: 'monospace', fontSize: 11, fontWeight: '900', color: '#000' },
-  smallThumb: { width: 40, height: 40, borderWidth: 1.5, borderColor: '#333', marginRight: 10, backgroundColor: '#2a2a2a' },
-  trackInfo: { flex: 1, marginRight: 8 },
-  trackTitle: { fontWeight: '700', fontSize: 13, color: '#e0d8c8' },
-  artistName: { fontSize: 11, fontFamily: 'monospace', color: '#e0d8c8', opacity: 0.5, marginTop: 2 },
-  metadata: { fontFamily: 'monospace', fontSize: 10, color: '#e0d8c8', opacity: 0.4, borderWidth: 1, borderColor: '#444', paddingHorizontal: 6, paddingVertical: 2 },
-});
