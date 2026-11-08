@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response, RequestHandler } from 'express';
 import { ZodError, ZodSchema } from 'zod';
+import { YouTubeBlockedError } from '../services/youtube';
 
 export class AppError extends Error {
   constructor(public status: number, message: string, public code?: string) {
@@ -29,6 +30,10 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
       message: first ? `${first.path.join('.') || 'input'}: ${first.message}` : 'Invalid input',
       issues: err.issues,
     });
+  }
+  if (err instanceof YouTubeBlockedError) {
+    res.setHeader('Retry-After', String(Math.ceil((err.retryAt - Date.now()) / 1000)));
+    return res.status(503).json({ message: err.message, code: 'YOUTUBE_BLOCKED' });
   }
   if (err instanceof AppError) {
     return res.status(err.status).json({ message: err.message, code: err.code });

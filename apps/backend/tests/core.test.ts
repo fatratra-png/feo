@@ -133,3 +133,15 @@ describe('extractMetadata with query hint', () => {
     expect(extractMetadata('Rim-Ka - GLITA (Official Video Music)', 'Rim-ka').artist).to.equal('Rim-Ka');
   });
 });
+
+import { isBotCheck } from '../src/services/youtube';
+
+describe('isBotCheck', () => {
+  it('recognises YouTube anti-bot challenges', () => {
+    expect(isBotCheck('ERROR: [youtube] abc: Sign in to confirm you’re not a bot. This helps protect our community.')).to.equal(true);
+    expect(isBotCheck('HTTP Error 429: Too Many Requests')).to.equal(true);
+  });
+  it('ignores ordinary failures', () => {
+    expect(isBotCheck('ERROR: [youtube] abc: Video unavailable')).to.equal(false);
+  });
+});

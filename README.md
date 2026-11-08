@@ -16,6 +16,7 @@ A music player built on the YouTube catalogue, with an AI that builds playlists,
 - Node.js ≥ 20 and PostgreSQL
 - **yt-dlp ≥ 2026.10 with its extras**: `python3 -m pip install --user -U "yt-dlp[default]"`.
   The `yt-dlp-ejs` package and Node as JS runtime are required: without them YouTube cuts audio streams after ~1 MB.
+- Optional but recommended: YouTube cookies (`YTDLP_COOKIES` or `YTDLP_COOKIES_FROM_BROWSER` in `apps/backend/.env`). Under heavy use YouTube may ask yt-dlp to prove it is not a bot. When that happens the API pauses yt-dlp for 3 minutes and returns `503 YOUTUBE_BLOCKED`; cookies make these challenges much rarer.
 
 ## Getting started
 

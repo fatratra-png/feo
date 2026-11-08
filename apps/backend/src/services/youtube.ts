@@ -14,14 +14,47 @@ const mixCache = new TTLCache<Song[]>(60 * MIN, 300);
 const resolveCache = new TTLCache<Song | null>(7 * 24 * 60 * MIN, 3000);
 const streamCache = new TTLCache<string>(60 * MIN, 500);
 
+/** Thrown when YouTube asks yt-dlp to prove it is not a bot. */
+export class YouTubeBlockedError extends Error {
+  constructor(public retryAt: number) {
+    super('YouTube limite temporairement les requêtes, réessaie dans quelques minutes');
+  }
+}
+
+export const isBotCheck = (message: string) => /confirm you.?re not a bot|sign in to confirm|HTTP Error 429|too many requests/i.test(message);
+
+const BOT_COOLDOWN_MS = 3 * 60 * 1000;
+let blockedUntil = 0;
+
+/** Optional cookies (exported from a logged-in browser) make YouTube far less likely to block. */
+function cookieArgs(): string[] {
+  if (process.env.YTDLP_COOKIES) return ['--cookies', process.env.YTDLP_COOKIES];
+  if (process.env.YTDLP_COOKIES_FROM_BROWSER) return ['--cookies-from-browser', process.env.YTDLP_COOKIES_FROM_BROWSER];
+  return [];
+}
+
+export const youtubeBlockedUntil = () => (blockedUntil > Date.now() ? new Date(blockedUntil).toISOString() : null);
+
 async function ytdlp(args: string[], timeout = 20000): Promise<string> {
+  // Hammering YouTube while it is challenging us only extends the block: back off instead.
+  if (blockedUntil > Date.now()) throw new YouTubeBlockedError(blockedUntil);
   return ytLimit(async () => {
-    const { stdout } = await run('yt-dlp', ['--no-warnings', ...args], {
-      timeout,
-      maxBuffer: 20 * 1024 * 1024,
-      encoding: 'utf-8',
-    });
-    return stdout;
+    try {
+      const { stdout } = await run('yt-dlp', ['--no-warnings', ...cookieArgs(), ...args], {
+        timeout,
+        maxBuffer: 20 * 1024 * 1024,
+        encoding: 'utf-8',
+      });
+      return stdout;
+    } catch (err) {
+      const message = `${(err as { stderr?: string }).stderr ?? ''} ${(err as Error).message}`;
+      if (isBotCheck(message)) {
+        blockedUntil = Date.now() + BOT_COOLDOWN_MS;
+        console.warn(`[youtube] bot check from YouTube: pausing yt-dlp for ${BOT_COOLDOWN_MS / 60000} min` + (cookieArgs().length ? '' : ' (set YTDLP_COOKIES to reduce this)'));
+        throw new YouTubeBlockedError(blockedUntil);
+      }
+      throw err;
+    }
   });
 }
 
@@ -137,6 +170,7 @@ export const youtube = {
           return out;
         }
       } catch (err) {
+        if (err instanceof YouTubeBlockedError) throw err;
         console.warn('[youtube] stream url failed', videoId, (err as Error).message.split('\n').slice(-2).join(' '));
       }
     }
