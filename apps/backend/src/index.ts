@@ -1,38 +1,28 @@
-import express from 'express';
 import cors from 'cors';
-import { config } from './config';
-import { errorHandler } from './middleware/errorHandler';
-import authRoutes from './routes/auth';
-import playlistRoutes from './routes/playlists';
-import likeRoutes from './routes/likes';
-import followRoutes from './routes/follows';
-import searchRoutes from './routes/search';
-import libraryRoutes from './routes/library';
-import youtubeRoutes from './routes/youtube';
-import recommendationRoutes from './routes/recommendations';
+import express from 'express';
+import { aiEnabled, config } from './config';
+import { errorHandler } from './lib/http';
+import { migrate } from './migrate';
+import { router } from './routes';
 
-const app = express();
+async function main() {
+  await migrate();
 
-const corsOrigin = process.env.FRONTEND_URL || (config.nodeEnv === 'production' ? 'https://yourdomain.com' : 'http://localhost:5173');
-app.use(cors({ origin: corsOrigin, credentials: true }));
-app.use(express.json());
+  const app = express();
+  app.disable('x-powered-by');
+  app.use(cors({ origin: config.frontendUrl, credentials: true }));
+  app.use(express.json({ limit: '1mb' }));
+  app.use('/api', router);
+  app.use('/api', (_req, res) => res.status(404).json({ message: 'Route introuvable' }));
+  app.use(errorHandler);
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+  app.listen(config.port, () => {
+    console.log(`FEO API → http://localhost:${config.port}/api`);
+    console.log(`AI: ${aiEnabled() ? config.ai.models.join(' → ') : 'disabled (no LLM_API_KEY)'}`);
+  });
+}
 
-app.use('/api/auth', authRoutes);
-app.use('/api/playlists', playlistRoutes);
-app.use('/api/likes', likeRoutes);
-app.use('/api/follows', followRoutes);
-app.use('/api/search', searchRoutes);
-app.use('/api/library', libraryRoutes);
-app.use('/api/youtube', youtubeRoutes);
-app.use('/api/recommendations', recommendationRoutes);
-
-app.use(errorHandler);
-
-app.listen(config.port, () => {
-  console.log(`FEO. API running on http://localhost:${config.port}`);
-  console.log(`Environment: ${config.nodeEnv}`);
+main().catch((err) => {
+  console.error('Failed to start:', err);
+  process.exit(1);
 });
