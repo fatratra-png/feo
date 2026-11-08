@@ -1,70 +1,82 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useAuthStore } from './stores/authStore';
-import { useThemeStore } from './stores/themeStore';
-import { authApi } from './lib/api';
-import { Layout } from './components/layout/Layout';
-import { Login } from './pages/Login';
-import { Register } from './pages/Register';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { AppShell, Logo } from './components/layout/AppShell';
+import { ApiError, setSessionExpiredHandler } from './lib/api';
+import { Login, Register } from './pages/Auth';
 import { Home } from './pages/Home';
+import { useAuthStore } from './stores/auth';
+import { usePlayerStore } from './stores/player';
+
+// Secondary pages are split out of the initial bundle.
+const Search = lazy(() => import('./pages/Search').then((m) => ({ default: m.Search })));
+const Library = lazy(() => import('./pages/Library').then((m) => ({ default: m.Library })));
+const Create = lazy(() => import('./pages/Create').then((m) => ({ default: m.Create })));
+const PlaylistPage = lazy(() => import('./pages/Collections').then((m) => ({ default: m.PlaylistPage })));
+const LikedPage = lazy(() => import('./pages/Collections').then((m) => ({ default: m.LikedPage })));
+const MixPage = lazy(() => import('./pages/Collections').then((m) => ({ default: m.MixPage })));
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, staleTime: 30000 } },
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+      retry: (count, err) => !(err instanceof ApiError && err.status >= 400 && err.status < 500) && count < 2,
+    },
+  },
 });
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthStore();
-  if (isLoading) return <div className="p-8 font-mono text-sm opacity-50 animate-pulse">loading...</div>;
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+function Splash() {
+  return (
+    <div className="grid min-h-dvh place-items-center" role="status" aria-label="Chargement">
+      <Logo className="animate-pulse text-5xl" />
+    </div>
+  );
+}
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const status = useAuthStore((s) => s.status);
+  const location = useLocation();
+  if (status === 'loading') return <Splash />;
+  if (status === 'anonymous') return <Navigate to="/login" replace state={{ from: location }} />;
   return <>{children}</>;
 }
 
-function AuthInit({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, setUser, setLoading } = useAuthStore();
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      authApi.me().then(setUser).catch(() => setUser(null));
-    } else {
-      setLoading(false);
-    }
-  }, []);
-
+function GuestOnly({ children }: { children: React.ReactNode }) {
+  const status = useAuthStore((s) => s.status);
+  if (status === 'loading') return <Splash />;
+  if (status === 'authenticated') return <Navigate to="/" replace />;
   return <>{children}</>;
-}
-
-function ThemeInit() {
-  const { isDark } = useThemeStore();
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('light', !isDark);
-  }, [isDark]);
-
-  return null;
 }
 
 export function App() {
+  const init = useAuthStore((s) => s.init);
+  useEffect(() => {
+    void init();
+    setSessionExpiredHandler(() => {
+      usePlayerStore.setState({ isPlaying: false });
+      queryClient.clear();
+      useAuthStore.getState().expire();
+    });
+  }, [init]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ThemeInit />
-        <AuthInit>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route
-              element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="/" element={<Home />} />
-            </Route>
+        <Routes>
+          <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
+          <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
+          <Route element={<RequireAuth><AppShell /></RequireAuth>}>
+            <Route index element={<Home />} />
+            <Route path="search" element={<Suspense fallback={null}><Search /></Suspense>} />
+            <Route path="library" element={<Suspense fallback={null}><Library /></Suspense>} />
+            <Route path="create" element={<Suspense fallback={null}><Create /></Suspense>} />
+            <Route path="liked" element={<Suspense fallback={null}><LikedPage /></Suspense>} />
+            <Route path="playlist/:id" element={<Suspense fallback={null}><PlaylistPage /></Suspense>} />
+            <Route path="mix/:id" element={<Suspense fallback={null}><MixPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </AuthInit>
+          </Route>
+        </Routes>
       </BrowserRouter>
     </QueryClientProvider>
   );
