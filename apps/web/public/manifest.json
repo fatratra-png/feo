@@ -1,12 +1,12 @@
 {
   "name": "FEO.",
   "short_name": "FEO",
-  "description": "Music streaming app",
+  "description": "Toute la musique, avec une IA qui compose tes playlists",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#08080c",
+  "theme_color": "#08080c",
   "categories": ["music", "entertainment"],
   "icons": [
     {

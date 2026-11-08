@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
       <head>
             <meta charset="UTF-8" />
             <link rel="icon" href="/assets/feo-app-logo.png" />
@@ -17,8 +17,16 @@
             <meta name="apple-mobile-web-app-title" content="Feo" />
             <meta name="mobile-web-app-capable" content="yes" />
             <meta name="theme-color" content="#000000" />
+            <meta name="description" content="FEO — écoute toute la musique, avec une IA qui compose tes playlists et ta radio." />
             <meta name="application-name" content="Feo" />
-            <title>Feo | Henoy ara</title>
+            <script>
+                  try {
+                        var t = localStorage.getItem("feo_theme");
+                        if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+                        document.documentElement.dataset.theme = t;
+                  } catch (e) { document.documentElement.dataset.theme = "dark"; }
+            </script>
+            <title>FEO — Henoy ara</title>
             <link rel="preconnect" href="https://fonts.googleapis.com" />
             <link
                   rel="preconnect"
@@ -26,7 +34,7 @@
                   crossorigin
             />
             <link
-                  href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap"
+                  href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap"
                   rel="stylesheet"
             />
       </head>
