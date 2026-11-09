@@ -3,18 +3,21 @@ import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AppShell, Logo } from './components/layout/AppShell';
 import { ApiError, setSessionExpiredHandler } from './lib/api';
-import { Login, Register } from './pages/Auth';
+import { pages } from './lib/pages';
 import { Home } from './pages/Home';
 import { useAuthStore } from './stores/auth';
 import { usePlayerStore } from './stores/player';
 
-// Secondary pages are split out of the initial bundle.
-const Search = lazy(() => import('./pages/Search').then((m) => ({ default: m.Search })));
-const Library = lazy(() => import('./pages/Library').then((m) => ({ default: m.Library })));
-const Create = lazy(() => import('./pages/Create').then((m) => ({ default: m.Create })));
-const PlaylistPage = lazy(() => import('./pages/Collections').then((m) => ({ default: m.PlaylistPage })));
-const LikedPage = lazy(() => import('./pages/Collections').then((m) => ({ default: m.LikedPage })));
-const MixPage = lazy(() => import('./pages/Collections').then((m) => ({ default: m.MixPage })));
+// Secondary pages are split out of the initial bundle (and prefetched when idle, see lib/pages).
+const Search = lazy(() => pages.search().then((m) => ({ default: m.Search })));
+const Library = lazy(() => pages.library().then((m) => ({ default: m.Library })));
+const Create = lazy(() => pages.create().then((m) => ({ default: m.Create })));
+const PlaylistPage = lazy(() => pages.collections().then((m) => ({ default: m.PlaylistPage })));
+const LikedPage = lazy(() => pages.collections().then((m) => ({ default: m.LikedPage })));
+const MixPage = lazy(() => pages.collections().then((m) => ({ default: m.MixPage })));
+// Signed-in users (most visits) never download the login pages.
+const Login = lazy(() => pages.auth().then((m) => ({ default: m.Login })));
+const Register = lazy(() => pages.auth().then((m) => ({ default: m.Register })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -30,6 +33,17 @@ function Splash() {
   return (
     <div className="grid min-h-dvh place-items-center" role="status" aria-label="Chargement">
       <Logo className="animate-pulse text-5xl" />
+    </div>
+  );
+}
+
+/** Shown only if a page chunk is not prefetched yet: a quiet skeleton, not a blank page. */
+function PageFallback() {
+  return (
+    <div className="space-y-4 px-4 pt-4 sm:px-6" role="status" aria-label="Chargement">
+      <div className="skeleton h-9 w-56 rounded-lg" />
+      <div className="skeleton h-40 w-full rounded-xl" />
+      <div className="skeleton h-40 w-full rounded-xl" />
     </div>
   );
 }
@@ -64,16 +78,16 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<GuestOnly><Login /></GuestOnly>} />
-          <Route path="/register" element={<GuestOnly><Register /></GuestOnly>} />
+          <Route path="/login" element={<GuestOnly><Suspense fallback={<Splash />}><Login /></Suspense></GuestOnly>} />
+          <Route path="/register" element={<GuestOnly><Suspense fallback={<Splash />}><Register /></Suspense></GuestOnly>} />
           <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={<Home />} />
-            <Route path="search" element={<Suspense fallback={null}><Search /></Suspense>} />
-            <Route path="library" element={<Suspense fallback={null}><Library /></Suspense>} />
-            <Route path="create" element={<Suspense fallback={null}><Create /></Suspense>} />
-            <Route path="liked" element={<Suspense fallback={null}><LikedPage /></Suspense>} />
-            <Route path="playlist/:id" element={<Suspense fallback={null}><PlaylistPage /></Suspense>} />
-            <Route path="mix/:id" element={<Suspense fallback={null}><MixPage /></Suspense>} />
+            <Route path="search" element={<Suspense fallback={<PageFallback />}><Search /></Suspense>} />
+            <Route path="library" element={<Suspense fallback={<PageFallback />}><Library /></Suspense>} />
+            <Route path="create" element={<Suspense fallback={<PageFallback />}><Create /></Suspense>} />
+            <Route path="liked" element={<Suspense fallback={<PageFallback />}><LikedPage /></Suspense>} />
+            <Route path="playlist/:id" element={<Suspense fallback={<PageFallback />}><PlaylistPage /></Suspense>} />
+            <Route path="mix/:id" element={<Suspense fallback={<PageFallback />}><MixPage /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
