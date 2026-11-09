@@ -67,9 +67,12 @@ export const playlists = {
       const songs = [...new Map((input.songs ?? []).map((s) => [s.id, s])).values()];
       if (songs.length) {
         await upsertSongs(songs, db);
-        for (const [i, s] of songs.entries()) {
-          await db.query(`INSERT INTO playlist_songs (playlist_id, song_id, position) VALUES ($1, $2, $3)`, [id, s.id, i]);
-        }
+        // One statement for the whole list instead of one round trip per song.
+        await db.query(
+          `INSERT INTO playlist_songs (playlist_id, song_id, position)
+           SELECT $1, t.id, t.ord - 1 FROM unnest($2::varchar[]) WITH ORDINALITY AS t(id, ord)`,
+          [id, songs.map((s) => s.id)],
+        );
       }
       return { id };
     });
@@ -91,20 +94,20 @@ export const playlists = {
   /** Appends songs, silently skipping ones already present. Returns how many were added. */
   async addSongs(userId: string, id: string, songs: Song[]): Promise<number> {
     await assertOwner(userId, id);
+    const unique = [...new Map(songs.map((s) => [s.id, s])).values()];
     return tx(async (db) => {
-      await upsertSongs(songs, db);
-      const { rows } = await db.query(`SELECT COALESCE(MAX(position), -1) AS max FROM playlist_songs WHERE playlist_id = $1`, [id]);
-      let pos: number = rows[0].max + 1;
-      let added = 0;
-      for (const s of songs) {
-        const r = await db.query(
-          `INSERT INTO playlist_songs (playlist_id, song_id, position) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-          [id, s.id, pos],
-        );
-        if (r.rowCount) { pos++; added++; }
-      }
+      await upsertSongs(unique, db);
+      // Songs already in the playlist are skipped; the new ones get contiguous positions after the last.
+      const r = await db.query(
+        `INSERT INTO playlist_songs (playlist_id, song_id, position)
+         SELECT $1, t.id, (SELECT COALESCE(MAX(position), -1) FROM playlist_songs WHERE playlist_id = $1) + ROW_NUMBER() OVER (ORDER BY t.ord)
+         FROM unnest($2::varchar[]) WITH ORDINALITY AS t(id, ord)
+         WHERE NOT EXISTS (SELECT 1 FROM playlist_songs ps WHERE ps.playlist_id = $1 AND ps.song_id = t.id)
+         ON CONFLICT DO NOTHING`,
+        [id, unique.map((s) => s.id)],
+      );
       await db.query(`UPDATE playlists SET updated_at = NOW() WHERE id = $1`, [id]);
-      return added;
+      return r.rowCount ?? 0;
     });
   },
 
@@ -120,12 +123,15 @@ export const playlists = {
     await tx(async (db) => {
       const { rows } = await db.query(`SELECT song_id FROM playlist_songs WHERE playlist_id = $1`, [id]);
       const current = new Set(rows.map((r) => r.song_id));
-      if (songIds.length !== current.size || songIds.some((s) => !current.has(s))) {
+      if (songIds.length !== current.size || new Set(songIds).size !== songIds.length || songIds.some((s) => !current.has(s))) {
         throw new AppError(409, 'La playlist a changé, recharge-la avant de réordonner');
       }
-      for (const [i, songId] of songIds.entries()) {
-        await db.query(`UPDATE playlist_songs SET position = $3 WHERE playlist_id = $1 AND song_id = $2`, [id, songId, i]);
-      }
+      await db.query(
+        `UPDATE playlist_songs ps SET position = t.ord - 1
+         FROM unnest($2::varchar[]) WITH ORDINALITY AS t(id, ord)
+         WHERE ps.playlist_id = $1 AND ps.song_id = t.id`,
+        [id, songIds],
+      );
       await db.query(`UPDATE playlists SET updated_at = NOW() WHERE id = $1`, [id]);
     });
   },
