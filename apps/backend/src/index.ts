@@ -1,9 +1,11 @@
+import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import { aiEnabled, config } from './config';
 import { errorHandler } from './lib/http';
 import { migrate } from './migrate';
 import { router } from './routes';
+import { warmStarters } from './services/ai';
 
 async function main() {
   await migrate();
@@ -11,6 +13,8 @@ async function main() {
   const app = express();
   app.disable('x-powered-by');
   app.use(cors({ origin: config.corsOrigins, credentials: true }));
+  // JSON (search results, playlists, home) shrinks ~5×; audio and images are skipped by type.
+  app.use(compression());
   app.use(express.json({ limit: '1mb' }));
   app.use('/api', router);
   app.use('/api', (_req, res) => res.status(404).json({ message: 'Route introuvable' }));
@@ -19,6 +23,7 @@ async function main() {
   const server = app.listen(config.port, () => {
     console.log(`FEO API → http://localhost:${config.port}/api`);
     console.log(`AI: ${aiEnabled() ? config.ai.models.join(' → ') : 'disabled (no LLM_API_KEY)'}`);
+    warmStarters();
   });
   server.on('error', (err: NodeJS.ErrnoException) => {
     if (err.code === 'EADDRINUSE') {
