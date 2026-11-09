@@ -145,3 +145,33 @@ describe('isBotCheck', () => {
     expect(isBotCheck('ERROR: [youtube] abc: Video unavailable')).to.equal(false);
   });
 });
+
+describe('TTLCache.swr (stale-while-revalidate)', () => {
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  it('serves a stale value at once and refreshes it in the background', async () => {
+    const cache = new TTLCache<number>(20);
+    let n = 0;
+    const fn = async () => { await wait(30); return ++n; };
+    expect(await cache.swr('k', fn, 1000)).to.equal(1);   // cold: waits
+    await wait(25);                                      // now expired, but within the stale window
+    const t = Date.now();
+    expect(await cache.swr('k', fn, 1000)).to.equal(1);   // stale, returned instantly
+    expect(Date.now() - t).to.be.below(15);
+    await wait(40);
+    expect(await cache.swr('k', fn, 1000)).to.equal(2);   // refreshed value
+  });
+  it('keeps the stale value when the refresh fails', async () => {
+    const cache = new TTLCache<string>(10);
+    await cache.swr('k', async () => 'ok', 1000);
+    await wait(15);
+    expect(await cache.swr('k', async () => { throw new Error('down'); }, 1000)).to.equal('ok');
+    await wait(5);
+    expect(await cache.swr('k', async () => 'later', 1000)).to.equal('ok');
+  });
+  it('waits for a fresh value once past the stale window', async () => {
+    const cache = new TTLCache<string>(5);
+    await cache.swr('k', async () => 'old', 5);
+    await wait(15);
+    expect(await cache.swr('k', async () => 'new', 5)).to.equal('new');
+  });
+});

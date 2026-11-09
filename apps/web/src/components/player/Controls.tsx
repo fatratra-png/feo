@@ -1,6 +1,7 @@
 import { Loader2, Pause, Play, Radio, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, Volume2, VolumeX } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { cn, formatTime } from '../../lib/format';
+import { useShallow } from 'zustand/react/shallow';
 import { usePlayerStore } from '../../stores/player';
 import { IconButton } from '../ui/Button';
 
@@ -35,7 +36,9 @@ export function PlayPauseButton({ size = 'md', className }: { size?: 'sm' | 'md'
 }
 
 export function TransportControls({ size = 'md' }: { size?: 'md' | 'lg' }) {
-  const { shuffle, repeat, toggleShuffle, cycleRepeat, previous, next } = usePlayerStore();
+  const { shuffle, repeat, toggleShuffle, cycleRepeat, previous, next } = usePlayerStore(
+    useShallow((s) => ({ shuffle: s.shuffle, repeat: s.repeat, toggleShuffle: s.toggleShuffle, cycleRepeat: s.cycleRepeat, previous: s.previous, next: s.next })),
+  );
   const hasSong = usePlayerStore((s) => s.index >= 0);
   const big = size === 'lg';
   const iconCls = big ? 'size-7' : 'size-5';
@@ -97,7 +100,9 @@ export function ProgressBar({ compact = false }: { compact?: boolean }) {
 }
 
 export function VolumeControl() {
-  const { volume, muted, setVolume, toggleMute } = usePlayerStore();
+  const { volume, muted, setVolume, toggleMute } = usePlayerStore(
+    useShallow((s) => ({ volume: s.volume, muted: s.muted, setVolume: s.setVolume, toggleMute: s.toggleMute })),
+  );
   const v = muted ? 0 : volume;
   const Icon = v === 0 ? VolumeX : v < 0.5 ? Volume1 : Volume2;
   return (

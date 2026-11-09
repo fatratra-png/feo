@@ -253,6 +253,20 @@ const STARTERS: { title: string; subtitle: string; query: string }[] = [
 
 const queryMixId = (q: string) => `q-${Buffer.from(q).toString('base64url')}`;
 
+/**
+ * Covers of the genre starters. Each is a YouTube search (seconds through
+ * yt-dlp): served stale for up to a day while refreshing in the background,
+ * so the home page never waits on them after the first time.
+ */
+const starterCache = new TTLCache<string[]>(30 * 60 * 1000, 50);
+const starterCovers = (q: string) =>
+  starterCache.swr(q, async () => (await youtube.search(q, 20)).map((x) => x.id).slice(0, 4), 24 * 3600 * 1000);
+
+/** Fills the starter covers at boot, so even the first visitor gets an instant home page. */
+export function warmStarters() {
+  for (const s of STARTERS) starterCovers(s.query).catch(() => undefined);
+}
+
 /** Instant, non-AI mixes: radios from favourite artists, or genre starters. */
 async function fallbackMixes(taste: Taste): Promise<Mix[]> {
   const mixes: Mix[] = [];
@@ -266,8 +280,8 @@ async function fallbackMixes(taste: Taste): Promise<Mix[]> {
   }
   const starters = await Promise.all(
     STARTERS.slice(0, 6 - mixes.length).map(async (s) => {
-      const songs = await youtube.search(s.query, 20).catch(() => [] as Song[]);
-      return { id: queryMixId(s.query), title: s.title, subtitle: s.subtitle, kind: 'query' as const, coverIds: songs.map((x) => x.id).slice(0, 4) };
+      const coverIds = await starterCovers(s.query).catch(() => [] as string[]);
+      return { id: queryMixId(s.query), title: s.title, subtitle: s.subtitle, kind: 'query' as const, coverIds };
     }),
   );
   // A starter whose search found no actual songs would open empty: hide it.
@@ -340,8 +354,7 @@ export function refreshAiMixes(userId: string, taste: Taste, force = false) {
 }
 
 export async function homeMixes(userId: string): Promise<{ mixes: Mix[]; aiPending: boolean; aiReady: boolean; taste: Taste }> {
-  const taste = await tasteProfile(userId);
-  const cached = await readCache<{ mixes: Mix[] }>(`home:${userId}`);
+  const [taste, cached] = await Promise.all([tasteProfile(userId), readCache<{ mixes: Mix[] }>(`home:${userId}`)]);
   const fallback = await fallbackMixes(taste);
   if (cached?.mixes?.length) {
     const ai = cached.mixes.map(({ songs, ...m }) => m);
