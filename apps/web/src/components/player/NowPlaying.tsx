@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { coverUrl } from '../../lib/api';
 import { cn, formatTime } from '../../lib/format';
+import { useShallow } from 'zustand/react/shallow';
 import { usePlayerStore } from '../../stores/player';
 import { LikeButton, SongMenu, moveActions } from '../song/SongActions';
 import { Button, IconButton } from '../ui/Button';
@@ -12,7 +13,10 @@ import { Equalizer } from '../ui/Feedback';
 import { ProgressBar, RadioToggle, TransportControls, VolumeControl } from './Controls';
 
 function QueuePanel() {
-  const { queue, index, isPlaying, jumpTo, removeAt, move, clearUpcoming, radio, radioLoading } = usePlayerStore();
+  // Picked fields only: the whole store changes ~4×/s with the playback position.
+  const { queue, index, isPlaying, jumpTo, removeAt, move, clearUpcoming, radio, radioLoading } = usePlayerStore(
+    useShallow((s) => ({ queue: s.queue, index: s.index, isPlaying: s.isPlaying, jumpTo: s.jumpTo, removeAt: s.removeAt, move: s.move, clearUpcoming: s.clearUpcoming, radio: s.radio, radioLoading: s.radioLoading })),
+  );
   const upcoming = queue.slice(index + 1);
   const current = queue[index];
 
