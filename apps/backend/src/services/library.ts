@@ -95,7 +95,7 @@ export const mainArtist = (artist: string) => artist.split(/,|&| feat\.? | ft\.?
  * start, a skip counts against, a like counts most. Recent activity weighs more.
  */
 export async function tasteProfile(userId: string): Promise<Taste> {
-  const songRows = await query<Song & { score: number; skips: number; plays: number }>(
+  const [songRows, recent] = await Promise.all([query<Song & { score: number; skips: number; plays: number }>(
     `WITH signals AS (
        SELECT song_id,
               CASE WHEN completed THEN 2.0 WHEN skipped THEN -1.5 ELSE 1.0 END
@@ -109,7 +109,10 @@ export async function tasteProfile(userId: string): Promise<Taste> {
      FROM signals g JOIN songs s ON s.id = g.song_id
      GROUP BY s.id ORDER BY score DESC`,
     [userId],
-  );
+  ), query<{ song_id: string }>(
+    `SELECT song_id FROM plays WHERE user_id = $1 ORDER BY played_at DESC LIMIT 60`,
+    [userId],
+  )]);
 
   const artists = new Map<string, { name: string; score: number; skips: number; plays: number }>();
   for (const row of songRows) {
@@ -123,10 +126,6 @@ export async function tasteProfile(userId: string): Promise<Taste> {
   }
 
   const ranked = [...artists.values()].sort((a, b) => b.score - a.score);
-  const recent = await query<{ song_id: string }>(
-    `SELECT song_id FROM plays WHERE user_id = $1 ORDER BY played_at DESC LIMIT 60`,
-    [userId],
-  );
 
   return {
     topArtists: ranked.filter((a) => a.score > 0).slice(0, 8).map(({ name, score }) => ({ name, score: Math.round(score * 10) / 10 })),

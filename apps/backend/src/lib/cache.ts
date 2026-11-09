@@ -36,6 +36,26 @@ export class TTLCache<V> {
   async wrap(key: string, fn: () => Promise<V>, ttlMs = this.ttlMs): Promise<V> {
     const cached = this.get(key);
     if (cached !== undefined) return cached;
+    return this.load(key, fn, ttlMs);
+  }
+
+  /**
+   * Stale-while-revalidate: like `wrap`, but a value that expired less than
+   * `staleMs` ago is returned at once while a fresh one is computed in the
+   * background. A failed refresh keeps serving the stale value.
+   */
+  async swr(key: string, fn: () => Promise<V>, staleMs: number, ttlMs = this.ttlMs): Promise<V> {
+    const hit = this.store.get(key);
+    const now = Date.now();
+    if (hit && hit.expires >= now) return this.get(key)!;
+    if (hit && hit.expires + staleMs >= now) {
+      if (!this.inflight.has(key)) this.load(key, fn, ttlMs).catch(() => undefined);
+      return hit.value;
+    }
+    return this.load(key, fn, ttlMs);
+  }
+
+  private load(key: string, fn: () => Promise<V>, ttlMs: number): Promise<V> {
     const pending = this.inflight.get(key);
     if (pending) return pending;
     const p = fn()
