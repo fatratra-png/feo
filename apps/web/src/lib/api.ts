@@ -9,7 +9,7 @@ import type {
   User,
 } from './types';
 
-const BASE = '/api';
+const BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const ACCESS = 'feo_access_token';
 const REFRESH = 'feo_refresh_token';
 
