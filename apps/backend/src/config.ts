@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 
+dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 function required(key: string): string {
@@ -22,6 +23,7 @@ export const config = {
     ...((process.env.NODE_ENV || 'development') === 'development' ? ['http://localhost:8081', 'http://localhost:19006'] : []),
   ],
   databaseUrl: required('DATABASE_URL'),
+  migrationDatabaseUrl: process.env.DATABASE_URL_UNPOOLED || required('DATABASE_URL'),
   jwt: {
     secret: required('JWT_SECRET'),
     refreshSecret: required('JWT_REFRESH_SECRET'),

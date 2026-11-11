@@ -6,28 +6,31 @@
  * carries a `yt__<id>` identifier, which broke likes, playlists and history.
  * v1 tables are renamed `legacy_*` (not dropped) so no data is lost.
  */
-import { pool } from './db';
+import { Pool } from 'pg';
+import { config } from './config';
 
 const LEGACY = ['tracks', 'albums', 'artists', 'likes', 'follows', 'listening_history', 'playlist_tracks', 'playlists'];
 
 export async function migrate() {
-  const client = await pool.connect();
+  const migrationPool = new Pool({ connectionString: config.migrationDatabaseUrl, max: 1 });
   try {
-    await client.query('BEGIN');
-    await client.query(`CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
-    const { rows } = await client.query(`SELECT value FROM schema_meta WHERE key = 'version'`);
-    const version = rows[0] ? parseInt(rows[0].value, 10) : 1;
+    const client = await migrationPool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(`CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
+      const { rows } = await client.query(`SELECT value FROM schema_meta WHERE key = 'version'`);
+      const version = rows[0] ? parseInt(rows[0].value, 10) : 1;
 
-    if (version < 2) {
-      for (const table of LEGACY) {
-        const exists = await client.query(`SELECT to_regclass($1) AS t`, [`public.${table}`]);
-        const legacyExists = await client.query(`SELECT to_regclass($1) AS t`, [`public.legacy_${table}`]);
-        if (exists.rows[0].t && !legacyExists.rows[0].t) {
-          await client.query(`ALTER TABLE ${table} RENAME TO legacy_${table}`);
+      if (version < 2) {
+        for (const table of LEGACY) {
+          const exists = await client.query(`SELECT to_regclass($1) AS t`, [`public.${table}`]);
+          const legacyExists = await client.query(`SELECT to_regclass($1) AS t`, [`public.legacy_${table}`]);
+          if (exists.rows[0].t && !legacyExists.rows[0].t) {
+            await client.query(`ALTER TABLE ${table} RENAME TO legacy_${table}`);
+          }
         }
-      }
 
-      await client.query(`
+        await client.query(`
         CREATE TABLE IF NOT EXISTS users (
           id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
           email VARCHAR(255) UNIQUE NOT NULL,
@@ -100,25 +103,28 @@ export async function migrate() {
           value JSONB NOT NULL,
           expires_at TIMESTAMPTZ NOT NULL
         );
-      `);
+        `);
 
-      await client.query(
-        `INSERT INTO schema_meta (key, value) VALUES ('version', '2')
-         ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
-      );
-      console.log('[migrate] schema upgraded to v2 (v1 tables kept as legacy_*)');
+        await client.query(
+          `INSERT INTO schema_meta (key, value) VALUES ('version', '2')
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        );
+        console.log('[migrate] schema upgraded to v2 (v1 tables kept as legacy_*)');
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
     }
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
   } finally {
-    client.release();
+    await migrationPool.end();
   }
 }
 
 if (require.main === module) {
   migrate()
-    .then(() => { console.log('[migrate] up to date'); return pool.end(); })
+    .then(() => { console.log('[migrate] up to date'); })
     .catch((err) => { console.error(err); process.exit(1); });
 }

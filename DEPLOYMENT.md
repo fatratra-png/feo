@@ -9,8 +9,9 @@ hébergé séparément sur Neon.
 ## 1. Créer la base Neon
 
 Créez un projet PostgreSQL dans la région que vous utiliserez pour l'API Render.
-Copiez la chaîne de connexion directe Neon dans `DATABASE_URL`, avec
-`sslmode=require`. Gardez cette valeur secrète.
+Conservez les deux chaînes de connexion Neon avec `sslmode=require` :
+`DATABASE_URL` (poolée) pour les requêtes de l'API et `DATABASE_URL_UNPOOLED`
+(directe) pour les migrations. Gardez ces valeurs secrètes.
 
 L'API applique automatiquement les migrations au démarrage. N'exécutez pas
 manuellement la migration en parallèle d'un premier démarrage.
@@ -20,12 +21,14 @@ manuellement la migration en parallèle d'un premier démarrage.
 Créez un Blueprint Render à partir du dépôt : il détectera `render.yaml` à la
 racine. Avant de créer le service, vérifiez la région Render et le plan tarifaire
 choisis. La région est difficile à modifier ensuite; privilégiez la même région
-que Neon. Un plan gratuit peut s'endormir et n'est pas adapté à une lecture
-audio toujours réactive.
+que Neon. Le Blueprint demande le plan gratuit pour éviter des frais; le service
+s'endort après inactivité, ce qui entraîne un délai au premier démarrage et ne
+convient pas à une lecture audio toujours réactive.
 
 Renseignez les variables demandées par le Blueprint :
 
-- `DATABASE_URL` : chaîne Neon complète et secrète.
+- `DATABASE_URL` : chaîne Neon poolée et secrète.
+- `DATABASE_URL_UNPOOLED` : chaîne Neon directe, utilisée pour les migrations.
 - `FRONTEND_URL` : origine de production Vercel, sans chemin ni slash final
   (par exemple `https://feo.vercel.app`). Plusieurs origines sont séparées par
   des virgules; ajoutez aussi votre domaine personnalisé s'il existe.

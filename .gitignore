@@ -12,3 +12,4 @@ coverage/
 .turbo/
 .tmp/node_modules/
 dist/
+.neon
