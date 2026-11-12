@@ -147,6 +147,7 @@ async function runChain<T>(messages: ChatMessage[], opts: ChatOptions): Promise<
 
 /** When every model is paused for a long time (daily quota), returns when AI comes back. */
 export function aiPausedUntil(): string | null {
+  if (!config.ai.models.length) return null;
   const now = Date.now();
   const until = Math.min(...config.ai.models.map((m) => cooldownUntil.get(m) ?? 0));
   return until > now + COOLDOWN_MS ? new Date(until).toISOString() : null;

@@ -2,8 +2,9 @@ import { expect } from 'chai';
 import { TTLCache, limiter } from '../src/lib/cache';
 import { extractMetadata } from '../src/lib/metadata';
 import { diversify } from '../src/services/ai';
+import { config } from '../src/config';
 import { mainArtist } from '../src/services/library';
-import { extractJson, orderModels } from '../src/services/llm';
+import { aiPausedUntil, extractJson, orderModels } from '../src/services/llm';
 import { pickBestMatch } from '../src/services/youtube';
 import { parseRange } from '../src/routes';
 
@@ -27,6 +28,18 @@ describe('orderModels (adaptive routing)', () => {
   });
   it('tries hinted fast models first, then the mid tier, for interactive work', () => {
     expect(orderModels(models, 'fast', ['fast-a', 'fast-b'], ['mid'])).to.deep.equal(['fast-a', 'fast-b', 'mid', 'slow-reasoner']);
+  });
+});
+
+describe('aiPausedUntil', () => {
+  it('returns null when no AI models are configured', () => {
+    const models = config.ai.models;
+    config.ai.models = [];
+    try {
+      expect(aiPausedUntil()).to.equal(null);
+    } finally {
+      config.ai.models = models;
+    }
   });
 });
 
