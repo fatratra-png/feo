@@ -74,6 +74,9 @@ jobs:
           --health-cmd "pg_isready -U feo" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       E2E_DATABASE_URL: postgresql://feo:feo@localhost:5432/feo_e2e
+      # Throwaway values for the API started by the e2e run (not production secrets).
+      JWT_SECRET: e2e-access-secret
+      JWT_REFRESH_SECRET: e2e-refresh-secret
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
