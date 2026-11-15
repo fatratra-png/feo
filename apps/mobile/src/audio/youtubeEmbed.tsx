@@ -24,7 +24,7 @@ export const YT_STATE = { UNSTARTED: -1, ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFER
  * so the page is loaded as if it were served from this origin. Point it at the
  * web app's domain with EXPO_PUBLIC_EMBED_ORIGIN.
  */
-export const EMBED_ORIGIN = (process.env.EXPO_PUBLIC_EMBED_ORIGIN || 'https://feo.app').replace(/\/$/, '');
+export const EMBED_ORIGIN = (process.env.EXPO_PUBLIC_EMBED_ORIGIN || 'https://feo-swart.vercel.app').replace(/\/$/, '');
 
 const html = `<!doctype html>
 <html><head>
