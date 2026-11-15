@@ -10,6 +10,8 @@ Règles absolues :
 - Ne propose QUE des chansons qui existent réellement, avec le titre et l'artiste exacts tels qu'on les trouve sur YouTube.
 - Varie les artistes (jamais plus de 2 titres du même artiste dans une liste), sauf demande explicite.
 - Respecte la langue, la culture, l'époque et l'énergie demandées. Les artistes malgaches sont les bienvenus quand c'est pertinent.
+- Un genre nommé dans la demande est une contrainte, pas une suggestion : ne le remplace jamais par un genre voisin ou par de la pop internationale.
+- Genres malgaches : salegy (Jaojoby, Wawa, Mily Clément, Ninie Doniah, Tianjama…), tsapiky, kilalaky, basesa, beko, vakodrazana, hira gasy. Pour eux, propose des artistes malgaches.
 - Réponds uniquement en JSON valide, sans texte autour.`;
 
 interface Suggestion {
@@ -160,9 +162,71 @@ export async function playlistFromPrompt(userId: string, prompt: string, count =
   }
 }
 
+/** What the AI understood of the request: the genres it must cover, and in which proportion. */
+export interface PlaylistBrief {
+  genres?: { name: string; share?: number; query?: string }[];
+}
+
+type Tagged<T> = T & { genre?: string };
+
+const normGenre = (g: string) => g.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Which requested genre a song's tag belongs to ("Afrobeats" → "afro"), or null. */
+export function matchGenre(tag: string | undefined, genres: string[]): string | null {
+  if (!tag) return null;
+  const t = normGenre(tag);
+  return genres.find((g) => { const n = normGenre(g); return n && (t.includes(n) || n.includes(t)); }) ?? null;
+}
+
+/**
+ * Keeps the AI's listening order but enforces the requested genre mix:
+ * each genre gets its share of `count`, songs tagged with an unrequested
+ * genre only fill what is left. Returns the picks and, per genre, how many
+ * songs are still missing.
+ */
+export function balanceByGenre<T extends Song>(songs: Tagged<T>[], brief: PlaylistBrief, count: number) {
+  const genres = (brief.genres ?? []).filter((g) => g?.name).slice(0, 4);
+  if (!genres.length) return { picks: songs.slice(0, count), missing: new Map<string, number>(), spare: [] as Tagged<T>[] };
+  const total = genres.reduce((a, g) => a + (g.share && g.share > 0 ? g.share : 1), 0);
+  const quota = new Map(genres.map((g) => [g.name, Math.max(1, Math.round(((g.share && g.share > 0 ? g.share : 1) / total) * count))]));
+  const names = genres.map((g) => g.name);
+  const used = new Map<string, number>();
+  const picks: Tagged<T>[] = [];
+  const spare: Tagged<T>[] = [];
+  for (const song of songs) {
+    const g = matchGenre(song.genre, names);
+    if (g && (used.get(g) ?? 0) < quota.get(g)!) {
+      used.set(g, (used.get(g) ?? 0) + 1);
+      picks.push(song);
+    } else if (!g) {
+      spare.push(song); // off-brief songs: only as a last resort
+    }
+  }
+  const missing = new Map<string, number>();
+  for (const name of names) {
+    const lack = quota.get(name)! - (used.get(name) ?? 0);
+    if (lack > 0) missing.set(name, lack);
+  }
+  return { picks: picks.slice(0, count), missing, spare };
+}
+
+/** Spreads `extra` evenly through `base` (top-ups shouldn't all land at the end). */
+export function interleave<T>(base: T[], extra: T[]): T[] {
+  if (!extra.length) return base;
+  if (!base.length) return extra;
+  const out: T[] = [];
+  const step = (base.length + extra.length) / extra.length;
+  let b = 0;
+  for (let i = 0, e = 0; i < base.length + extra.length; i++) {
+    if (e < extra.length && i >= Math.round(e * step + step / 2) - 1) out.push(extra[e++]);
+    else out.push(base[b++]);
+  }
+  return out;
+}
+
 async function playlistWithAi(userId: string, prompt: string, count: number): Promise<GeneratedPlaylist> {
   const taste = await tasteProfile(userId);
-  const { data, model } = await chatJson<{ name: string; description: string; songs: Suggestion[] }>(
+  const { data, model } = await chatJson<{ name: string; description: string; brief?: PlaylistBrief; songs: Tagged<Suggestion>[] }>(
     [
       { role: 'system', content: SYSTEM },
       {
@@ -171,22 +235,50 @@ async function playlistWithAi(userId: string, prompt: string, count: number): Pr
 
 Contexte (à n'utiliser que si cela colle à la demande) — artistes que l'utilisateur aime : ${taste.topArtists.map((a) => a.name).join(', ') || 'inconnus'}.
 
-Donne ${count + 6} chansons dans un ordre d'écoute agréable (montée en énergie progressive si c'est pertinent).
-Format : {"name":"titre accrocheur, max 40 caractères","description":"une phrase en français","songs":[{"title":"...","artist":"...","reason":"max 8 mots"}]}`,
+Étapes :
+1. Analyse la demande dans "brief" : liste chaque genre ou style explicitement demandé, avec sa part (parts égales si rien n'est précisé) et une requête YouTube courte qui trouve ce genre (ex. "salegy malagasy"). Si aucun genre n'est nommé, déduis 1 à 2 styles de l'ambiance.
+2. Donne ${count + 6} chansons qui respectent ces parts, chacune avec son "genre" (un des noms du brief). Aucune chanson hors brief.
+3. Ordonne-les pour une écoute agréable (montée en énergie progressive si c'est pertinent), en alternant les genres.
+
+Format : {"name":"titre accrocheur, max 40 caractères","description":"une phrase en français","brief":{"genres":[{"name":"salegy","share":0.5,"query":"salegy malagasy"}]},"songs":[{"title":"...","artist":"...","genre":"salegy","reason":"max 8 mots"}]}`,
       },
     ],
-    { budgetMs: 75_000, temperature: 0.85, maxTokens: 4000, priority: 'fast' },
+    { budgetMs: 75_000, temperature: 0.6, maxTokens: 4000, priority: 'fast' },
   );
-  let songs = diversify(await resolveSuggestions(data.songs ?? [], new Set()), 3).slice(0, count);
+  const brief: PlaylistBrief = data.brief ?? {};
+  const suggestions = data.songs ?? [];
+  const resolved = await resolveSuggestions(suggestions, new Set());
+  // resolveSuggestions keeps the AI's title/artist: use them to recover each song's genre tag.
+  const genreOf = new Map(suggestions.map((s) => [`${s.title?.trim().slice(0, 120)}|${s.artist?.trim().slice(0, 80)}`, s.genre]));
+  const tagged = diversify(resolved, 2).map((s) => ({ ...s, genre: genreOf.get(`${s.title}|${s.artist}`) }));
+  const { picks, missing, spare } = balanceByGenre(tagged, brief, count);
+  let songs: CuratedSong[] = picks.map(({ genre: _genre, ...s }) => s);
+
+  // Top up each under-represented genre from its own sources: the YouTube mix of
+  // the verified songs of that genre, or a YouTube search for it. Never from the
+  // other genres, which is what made niche genres disappear before.
+  const seen = new Set(songs.map((s) => s.id));
+  const topUps: CuratedSong[] = [];
+  for (const [name, lack] of missing) {
+    const own = picks.filter((s) => matchGenre(s.genre, [name]));
+    const query = brief.genres?.find((g) => g.name === name)?.query || `${name} music`;
+    const pools = own.length
+      ? await Promise.all(own.slice(0, 2).map((s) => youtube.mix(s.id, 15)))
+      : [await youtube.search(query, 15).catch(() => [] as Song[])];
+    const extra = diversify(pools.flat().filter((s) => !seen.has(s.id)), 2).slice(0, lack);
+    for (const s of extra) seen.add(s.id);
+    topUps.push(...extra.map((s) => ({ ...s, reason: `Pour la touche ${name}` })));
+  }
+  songs = interleave(songs, topUps);
+  if (songs.length < count) songs.push(...spare.filter((s) => !seen.has(s.id)).map(({ genre: _genre, ...s }) => s));
   if (songs.length >= 3 && songs.length < count) {
-    // The AI sometimes names songs that don't exist (common for niche genres):
-    // top up with YouTube's mix of the verified ones, which keeps the same vibe.
-    const seen = new Set(songs.map((s) => s.id));
+    // Still short (the AI named songs that don't exist): same-vibe YouTube mixes.
     const mixes = await Promise.all(songs.slice(0, 3).map((s) => youtube.mix(s.id, 15)));
     const extra = diversify(mixes.flat().filter((s) => !seen.has(s.id) && (seen.add(s.id), true)), 2)
       .map((s) => ({ ...s, reason: 'Dans la même ambiance' }));
-    songs = diversify([...songs, ...extra], 3).slice(0, count);
+    songs = [...songs, ...extra];
   }
+  songs = diversify(songs, 2).slice(0, count);
   return {
     name: (data.name || prompt).slice(0, 60),
     description: (data.description || '').slice(0, 240),
