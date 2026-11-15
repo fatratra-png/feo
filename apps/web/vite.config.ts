@@ -31,12 +31,23 @@ function prerenderLegal(): Plugin {
         const { renderToStaticMarkup } = await import('react-dom/server');
         const { createElement } = await import('react');
         const legal = await server.ssrLoadModule(path.resolve(__dirname, 'src/pages/Legal.tsx'));
+        const landing = await server.ssrLoadModule(path.resolve(__dirname, 'src/pages/Landing.tsx'));
+        const wrap = (markup: string) => markup;
+        await writeFile(path.join(dist, 'install.html'), template
+          .replace(/<title>[^<]*<\/title>/, '<title>Installer FEO — Android et iPhone</title>')
+          .replace(/(<meta name="description" content=")[^"]*(")/, "$1Installe FEO sur Android (APK) ou sur iPhone depuis Safari, gratuitement et sans store.$2")
+          .replace(/(<link rel="canonical" href=")[^"]*(")/, '$1https://feo-swart.vercel.app/install$2')
+          .replace('<div id="root"></div>', `<div id="root">${wrap(renderToStaticMarkup(createElement(landing.Install)))}</div>`));
+        // The home page itself: crawlers and first-time visitors get the landing without waiting for JavaScript.
+        await writeFile(path.join(dist, 'index.html'), template
+          .replace('<div id="root"></div>', `<div id="root"><div data-landing>${renderToStaticMarkup(createElement(landing.Landing))}</div></div>`));
         for (const page of pages) {
           const body = renderToStaticMarkup(createElement(legal[page.component]));
           if (body.length < 2000) throw new Error(`prerendered ${page.file} looks empty`);
           const html = template
             .replace(/<title>[^<]*<\/title>/, `<title>${page.title}</title>`)
             .replace(/(<meta name="description" content=")[^"]*(")/, `$1${page.description}$2`)
+            .replace(/(<link rel="canonical" href=")[^"]*(")/, `$1https://feo-swart.vercel.app/${page.file.replace('.html', '')}$2`)
             .replace('<div id="root"></div>', `<div id="root">${body}</div>`);
           await writeFile(path.join(dist, page.file), html);
         }
