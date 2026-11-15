@@ -130,3 +130,4 @@ export const api = {
 
 export const streamUrl = (id: string) => `${API_URL}/stream/${id}`;
 export const coverUrl = (id: string, size: 'sm' | 'lg' = 'sm') => `${API_URL}/thumb/${id}${size === 'lg' ? '?size=lg' : ''}`;
+export const healthUrl = `${API_URL}/health`;
