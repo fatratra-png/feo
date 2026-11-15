@@ -4,6 +4,7 @@ import { TTLCache, limiter } from '../lib/cache';
 import { extractMetadata } from '../lib/metadata';
 import { Song, YT_ID } from '../lib/types';
 import { SONG_MAX_SECONDS, SONG_MIN_SECONDS, isLikelySong } from '../lib/songFilter';
+import { RawVideo, innertube } from './innertube';
 
 const run = promisify(execFile);
 const ytLimit = limiter(6);
@@ -84,6 +85,14 @@ export function isSongLike(song: Song, maxSeconds = SONG_MAX_SECONDS) {
   return song.duration === 0 || (song.duration >= SONG_MIN_SECONDS && song.duration <= maxSeconds);
 }
 
+const fromInnertube = (v: RawVideo): RawEntry => ({
+  id: v.id,
+  title: v.title,
+  channel: v.channel,
+  duration: v.duration,
+  live_status: v.live ? 'is_live' : null,
+});
+
 function parseLines(stdout: string): RawEntry[] {
   return stdout
     .split('\n')
@@ -112,8 +121,16 @@ export const youtube = {
     if (!query) return [];
     return searchCache.wrap(`${limit}:${norm(query)}`, async () => {
       // Over-fetch: the song filter typically drops 10–40 % of raw results.
-      const out = await ytdlp(['--dump-json', '--flat-playlist', `ytsearch${Math.ceil(limit * 1.6)}:${query}`]);
-      return dedupe(parseLines(out).map((r) => toSong(r, true, query)).filter((s): s is Song => !!s)).slice(0, limit);
+      const want = Math.ceil(limit * 1.6);
+      let raw: RawEntry[];
+      try {
+        raw = (await innertube.search(query, want)).map(fromInnertube);
+        if (!raw.length) throw new Error('no results');
+      } catch (err) {
+        console.warn('[youtube] innertube search failed, using yt-dlp:', (err as Error).message);
+        raw = parseLines(await ytdlp(['--dump-json', '--flat-playlist', `ytsearch${want}:${query}`]));
+      }
+      return dedupe(raw.map((r) => toSong(r, true, query)).filter((s): s is Song => !!s)).slice(0, limit);
     });
   },
 
@@ -121,6 +138,12 @@ export const youtube = {
   async mix(videoId: string, limit = 25): Promise<Song[]> {
     if (!YT_ID.test(videoId)) return [];
     return mixCache.wrap(`${videoId}:${limit}`, async () => {
+      try {
+        const raw = (await innertube.mix(videoId)).slice(0, limit + 1).map(fromInnertube);
+        if (raw.length > 1) return dedupe(raw.map((r) => toSong(r)).filter((s): s is Song => !!s && s.id !== videoId));
+      } catch (err) {
+        console.warn('[youtube] innertube mix failed, using yt-dlp:', (err as Error).message);
+      }
       try {
         const out = await ytdlp([
           '--dump-json',

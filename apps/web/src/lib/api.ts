@@ -145,4 +145,5 @@ export const api = {
 };
 
 export const streamUrl = (id: string) => `${BASE}/stream/${id}`;
+export const healthUrl = `${BASE}/health`;
 export const coverUrl = (id: string, size: 'sm' | 'lg' = 'sm') => `${BASE}/thumb/${id}${size === 'lg' ? '?size=lg' : ''}`;
