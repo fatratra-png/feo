@@ -13,6 +13,24 @@ export interface User {
   displayName: string;
   avatarUrl: string | null;
   createdAt: string;
+  /** Only on /auth/me: false for accounts created with Google/GitHub until a password is set. */
+  hasPassword?: boolean;
+  /** Only on /auth/me: external logins linked to the account. */
+  providers?: OAuthProvider[];
+}
+
+export type OAuthProvider = 'google' | 'github';
+
+export interface Session {
+  user: User;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface AuthProviders {
+  google: boolean;
+  github: boolean;
+  passwordResetEmail: boolean;
 }
 
 export interface PlaylistSummary {

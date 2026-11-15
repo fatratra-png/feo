@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { api, loadTokens, setTokens } from '../lib/api';
-import type { User } from '../lib/types';
+import type { Session, User } from '../lib/types';
 
 interface AuthState {
   user: User | null;
@@ -10,6 +10,10 @@ interface AuthState {
   register: (email: string, password: string, displayName: string) => Promise<void>;
   logout: () => Promise<void>;
   expire: () => void;
+  /** Starts a session obtained elsewhere (Google/GitHub). */
+  setSession: (session: Session) => Promise<void>;
+  /** Reloads the profile (hasPassword, providers) after an account change. */
+  refreshUser: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -40,4 +44,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ user: null, status: 'anonymous' });
   },
   expire: () => set({ user: null, status: 'anonymous' }),
+  setSession: async ({ user, accessToken, refreshToken }) => {
+    await setTokens(accessToken, refreshToken);
+    set({ user, status: 'authenticated' });
+  },
+  refreshUser: async () => {
+    set({ user: await api.auth.me() });
+  },
 }));

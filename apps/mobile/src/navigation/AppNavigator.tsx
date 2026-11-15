@@ -8,7 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MiniPlayer } from '../components/player';
 import { AddToPlaylistSheet, navigationRef, SongSheet, Toaster } from '../components/sheets';
 import { Logo, Press, T } from '../components/ui';
-import { LoginScreen, RegisterScreen } from '../screens/AuthScreens';
+import { AccountScreen } from '../screens/AccountScreen';
+import { ForgotPasswordScreen, LoginScreen, RegisterScreen } from '../screens/AuthScreens';
 import { LikedScreen, MixScreen, PlaylistScreen } from '../screens/CollectionScreens';
 import { CreateScreen } from '../screens/CreateScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -105,12 +106,14 @@ export function AppNavigator() {
             <Stack.Screen name="Playlist" component={PlaylistScreen} />
             <Stack.Screen name="Liked" component={LikedScreen} />
             <Stack.Screen name="Mix" component={MixScreen} />
+            <Stack.Screen name="Account" component={AccountScreen} />
             <Stack.Screen name="NowPlaying" component={NowPlayingScreen} options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
           </>
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           </>
         )}
       </Stack.Navigator>

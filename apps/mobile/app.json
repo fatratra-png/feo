@@ -46,7 +46,9 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
-    ]
+      ],
+      "expo-web-browser"
+    ],
+    "scheme": "feo"
   }
 }

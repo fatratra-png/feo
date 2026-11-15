@@ -58,6 +58,22 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
 
+  mobile:
+    name: Mobile (typecheck)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+
   e2e:
     name: End-to-end (Cypress)
     runs-on: ubuntu-latest

@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { RefreshControl, ScrollView, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CardRow, MixCard, PlaylistCard, QuickTile, SectionGap } from '../components/song';
-import { Sheet } from '../components/sheets';
+import { navigationRef, Sheet } from '../components/sheets';
 import { Button, Chip, ErrorState, IconButton, Logo, Press, SectionTitle, Skeleton, T } from '../components/ui';
 import { api } from '../lib/api';
 import { greeting } from '../lib/format';
@@ -45,6 +45,12 @@ function AccountSheet({ visible, onClose }: { visible: boolean; onClose: () => v
             </Press>
           ))}
         </View>
+        <Button
+          label="Mon compte"
+          variant="secondary"
+          icon="person-circle-outline"
+          onPress={() => { onClose(); navigationRef.navigate('Account'); }}
+        />
         <Button
           label="Se déconnecter"
           variant="secondary"

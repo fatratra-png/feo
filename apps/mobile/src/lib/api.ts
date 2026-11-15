@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
 import { storage } from './storage';
-import type { GeneratedPlaylist, HomeData, Playlist, PlaylistSummary, RadioResult, SmartSearchResult, Song, User } from './types';
+import type { AuthProviders, GeneratedPlaylist, HomeData, OAuthProvider, Playlist, PlaylistSummary, RadioResult, Session, SmartSearchResult, Song, User } from './types';
+
+/** Deep link the API sends the browser back to after a Google/GitHub login (app.json "scheme"). */
+export const OAUTH_RETURN_URL = 'feo://auth';
 
 /**
  * On a phone, "localhost" is the phone itself: set EXPO_PUBLIC_API_URL to the
@@ -96,6 +99,13 @@ export const api = {
     register: (email: string, password: string, displayName: string) =>
       request<{ user: User; accessToken: string; refreshToken: string }>('/auth/register', { method: 'POST', json: { email, password, displayName } }),
     me: () => request<User>('/auth/me'),
+    providers: () => request<AuthProviders>('/auth/providers'),
+    /** Opened in the system browser; the API redirects to OAUTH_RETURN_URL with a one-time code. */
+    oauthStartUrl: (provider: OAuthProvider) => `${API_URL}/auth/oauth/${provider}/start?target=mobile`,
+    oauthExchange: (code: string) => request<Session>('/auth/oauth/exchange', { method: 'POST', json: { code } }),
+    changePassword: (newPassword: string, currentPassword?: string) =>
+      request<{ accessToken: string; refreshToken: string }>('/auth/password', { method: 'PUT', json: { currentPassword, newPassword } }),
+    forgotPassword: (email: string) => request<{ ok: true }>('/auth/forgot-password', { method: 'POST', json: { email } }),
     logout: () => request('/auth/logout', { method: 'POST', json: { refreshToken } }).catch(() => undefined),
   },
   search: (q: string) => request<{ songs: Song[] }>(`/search?q=${encodeURIComponent(q)}`),
