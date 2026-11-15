@@ -18,6 +18,10 @@ const MixPage = lazy(() => pages.collections().then((m) => ({ default: m.MixPage
 // Signed-in users (most visits) never download the login pages.
 const Login = lazy(() => pages.auth().then((m) => ({ default: m.Login })));
 const Register = lazy(() => pages.auth().then((m) => ({ default: m.Register })));
+const ForgotPassword = lazy(() => pages.auth().then((m) => ({ default: m.ForgotPassword })));
+const ResetPassword = lazy(() => pages.auth().then((m) => ({ default: m.ResetPassword })));
+const OAuthCallback = lazy(() => pages.auth().then((m) => ({ default: m.OAuthCallback })));
+const Account = lazy(() => pages.account().then((m) => ({ default: m.Account })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,6 +84,10 @@ export function App() {
         <Routes>
           <Route path="/login" element={<GuestOnly><Suspense fallback={<Splash />}><Login /></Suspense></GuestOnly>} />
           <Route path="/register" element={<GuestOnly><Suspense fallback={<Splash />}><Register /></Suspense></GuestOnly>} />
+          <Route path="/forgot-password" element={<GuestOnly><Suspense fallback={<Splash />}><ForgotPassword /></Suspense></GuestOnly>} />
+          {/* Reachable signed in or not: the link comes from an email. */}
+          <Route path="/reset-password" element={<Suspense fallback={<Splash />}><ResetPassword /></Suspense>} />
+          <Route path="/auth/callback" element={<Suspense fallback={<Splash />}><OAuthCallback /></Suspense>} />
           <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={<Home />} />
             <Route path="search" element={<Suspense fallback={<PageFallback />}><Search /></Suspense>} />
@@ -88,6 +96,7 @@ export function App() {
             <Route path="liked" element={<Suspense fallback={<PageFallback />}><LikedPage /></Suspense>} />
             <Route path="playlist/:id" element={<Suspense fallback={<PageFallback />}><PlaylistPage /></Suspense>} />
             <Route path="mix/:id" element={<Suspense fallback={<PageFallback />}><MixPage /></Suspense>} />
+            <Route path="account" element={<Suspense fallback={<PageFallback />}><Account /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>

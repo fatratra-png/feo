@@ -1,5 +1,8 @@
 import type {
+  AuthProviders,
   GeneratedPlaylist,
+  OAuthProvider,
+  Session,
   HomeData,
   Playlist,
   PlaylistSummary,
@@ -106,10 +109,19 @@ const toSong = ({ id, title, artist, duration }: Song): Song => ({ id, title, ar
 export const api = {
   auth: {
     login: (email: string, password: string) =>
-      request<{ user: User; accessToken: string; refreshToken: string }>('/auth/login', { method: 'POST', json: { email, password } }),
+      request<Session>('/auth/login', { method: 'POST', json: { email, password } }),
     register: (email: string, password: string, displayName: string) =>
-      request<{ user: User; accessToken: string; refreshToken: string }>('/auth/register', { method: 'POST', json: { email, password, displayName } }),
+      request<Session>('/auth/register', { method: 'POST', json: { email, password, displayName } }),
     me: () => request<User>('/auth/me'),
+    providers: () => request<AuthProviders>('/auth/providers'),
+    /** Full-page navigation target: the API redirects to Google/GitHub. */
+    oauthStartUrl: (provider: OAuthProvider) => `${BASE}/auth/oauth/${provider}/start`,
+    oauthExchange: (code: string) => request<Session>('/auth/oauth/exchange', { method: 'POST', json: { code } }),
+    changePassword: (newPassword: string, currentPassword?: string) =>
+      request<{ accessToken: string; refreshToken: string }>('/auth/password', { method: 'PUT', json: { currentPassword, newPassword } }),
+    forgotPassword: (email: string) => request<{ ok: true }>('/auth/forgot-password', { method: 'POST', json: { email } }),
+    resetPassword: (token: string, password: string) =>
+      request<Session>('/auth/reset-password', { method: 'POST', json: { token, password } }),
     logout: () => request('/auth/logout', { method: 'POST', json: { refreshToken } }).catch(() => undefined),
   },
   search: (q: string) => request<{ songs: Song[] }>(`/search?q=${encodeURIComponent(q)}`),
