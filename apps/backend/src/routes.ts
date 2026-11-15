@@ -27,6 +27,7 @@ export const router = Router();
 
 /** Resolving a stream URL takes ~5 s (yt-dlp): do it ahead for the songs most likely to be played. */
 function warmStreams(ids: string[]) {
+  if (process.env.NODE_ENV === 'test') return;
   for (const id of ids) youtube.streamUrl(id).catch(() => null);
 }
 
@@ -55,7 +56,8 @@ function rateLimit(max: number, windowMs: number): RequestHandler {
     next();
   };
 }
-const authLimit = rateLimit(10, 10 * 60 * 1000);
+// AUTH_RATE_LIMIT only exists so end-to-end test runs (many sign-ups from one IP) are not throttled.
+const authLimit = rateLimit(Number(process.env.AUTH_RATE_LIMIT) || 10, 10 * 60 * 1000);
 
 router.post('/auth/register', authLimit, handler(async (req, res) => {
   const body = z.object({

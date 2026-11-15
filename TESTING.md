@@ -1,168 +1,105 @@
-# FEO Music Player - Testing Guide
+# Tests de FEO
 
-## Frontend Tests (Vitest)
+Trois niveaux de tests, du plus rapide au plus complet. Aucun n'appelle
+YouTube ni l'IA : ces services sont simulés, donc les tests passent partout,
+y compris en CI.
 
-Frontend tests are located in `apps/web/tests/` and use **Vitest** with React Testing Library.
+| Niveau | Outil | Où | Commande |
+| --- | --- | --- | --- |
+| Unitaires backend | Mocha + Chai | `apps/backend/tests/*.test.ts` | `cd apps/backend && npm test` |
+| Intégration API (HTTP + PostgreSQL) | Mocha + Supertest | `apps/backend/tests/api.integration.test.ts` | idem, avec `TEST_DATABASE_URL` |
+| Unitaires web | Vitest (+ jsdom, Testing Library) | `apps/web/tests/*.test.ts(x)` | `cd apps/web && npm test` |
+| End-to-end | Cypress | `apps/web/cypress/e2e/*.cy.ts` | `cd apps/web && npm run test:e2e` |
 
-### Running Tests
+La CI (`.github/workflows/ci.yml`) exécute les quatre sur chaque pull request,
+avec un PostgreSQL de service.
 
-```bash
-cd apps/web
-
-# Run all tests once
-npm test
-
-# Run tests in watch mode
-npm run test:watch
-
-# Run specific test file
-npm test playerStore.test.ts
-```
-
-### Test Coverage
-
-- **playerStore.test.ts** - Player state management
-  - Play/Pause controls
-  - Next/Previous track navigation
-  - Repeat modes (off, one, all)
-  - Shuffle functionality
-  - Queue management
-  - Volume control
-  - Progress tracking
-
-- **api.test.ts** - API client methods
-  - Recommendations API
-  - AI suggestions endpoint
-  - Skip tracking
-
-## Backend Tests (Mocha + Chai)
-
-Backend tests are located in `apps/backend/tests/` and use **Mocha** with **Chai** assertions.
-
-### Running Tests
+## Backend
 
 ```bash
 cd apps/backend
-
-# Install dependencies first
-npm install
-
-# Run all tests once
 npm test
+```
 
-# Run tests in watch mode
+Sans base de données, les tests d'intégration sont marqués *pending* et le
+reste s'exécute. Pour les lancer, donnez une base **dédiée aux tests** : la
+suite vide ses tables au démarrage.
+
+```bash
+# Base locale : un schéma séparé suffit (pas besoin du droit CREATE DATABASE)
+psql "$DATABASE_URL" -c 'CREATE SCHEMA IF NOT EXISTS feo_test'
+TEST_DATABASE_URL="postgresql://feo:…@localhost:5432/feo?options=-c%20search_path%3Dfeo_test" npm test
+```
+
+`tests/setup.ts` est chargé avant tous les fichiers : il fournit les variables
+d'environnement requises, désactive l'IA et le préchargement des flux.
+
+Ce qui est couvert :
+
+- `core.test.ts` : extraction JSON des réponses LLM, routage des modèles,
+  choix du meilleur résultat YouTube, filtre « chansons uniquement »,
+  métadonnées, en-têtes `Range`, caches, limiteur de concurrence.
+- `innertube.test.ts` : lecture des réponses InnerTube (recherche, pagination,
+  mix), erreurs HTTP, et le service `youtube` au-dessus (nettoyage des titres,
+  doublons, direct et compilations écartés).
+- `api.integration.test.ts` : inscription, connexion, rotation et révocation
+  des refresh tokens, likes, écoutes et historique, playlists (création,
+  ajout, réordonnancement, renommage, suppression, accès d'un autre
+  utilisateur), validation des entrées, recherche avec YouTube simulé.
+
+## Web
+
+```bash
+cd apps/web
+npm test          # une fois
 npm run test:watch
-
-# Run specific test file
-npm test tests/llmService.test.ts
 ```
 
-### Test Coverage
+- `player.test.ts` : file d'attente, répétition, aléatoire, signaux d'écoute,
+  radio IA, couleur d'accent.
+- `AudioEngine.test.tsx` : lecture via le proxy de l'API, bascule automatique
+  vers le lecteur YouTube intégré quand le proxy échoue, synchronisation
+  lecture/pause/position/volume, titre suivant, titres non intégrables.
+- `youtubeEmbed.test.ts` : chargement de l'API IFrame, préférence mémorisée.
+- `api.test.ts` : jeton d'accès, rafraîchissement de session (unique pour des
+  requêtes simultanées), expiration, messages d'erreur.
+- `stores.test.ts` : authentification, notifications, thème.
+- `format.test.ts` : durées, pluriels, dates relatives.
 
-- **llmService.test.ts** - LLM API integration
-  - Recommendation generation
-  - AI suggestion generation
-  - API error handling
-  - Missing credentials handling
+## End-to-end (Cypress)
 
-- **recommendationService.test.ts** - Recommendation logic
-  - Cache management
-  - Track deduplication
-  - Recommendation prioritization
-  - Fallback strategies
+Les tests e2e pilotent la vraie application web contre la vraie API et une
+vraie base PostgreSQL. Seul YouTube est simulé (`cy.fakeYouTube()` dans
+`cypress/support/e2e.ts`) : résultats de recherche, flux audio (un fichier WAV
+silencieux), pochettes et lecteur IFrame.
 
-- **recommendationController.test.ts** - API endpoint validation
-  - Parameter validation
-  - Query parsing
-  - Response formatting
-  - Fallback suggestions
-
-## Player Controls Implementation
-
-All player controls are now fully implemented:
-
-### Controls
-- **Play/Pause** - Toggle playback (status: ✓)
-- **Next** - Skip to next track (status: ✓)
-- **Previous** - Go to previous track (status: ✓)
-- **Repeat** - Cycle through repeat modes: off → one → all (status: ✓)
-- **Shuffle** - Random queue order (status: ✓)
-- **Auto-play** - AI suggestions for next track (status: ✓)
-
-### Next Track Features
-- Shows upcoming track from manual queue
-- Displays AI-generated next track when auto-play enabled
-- Shows track metadata (title, artist)
-- Indicates if suggestion is AI-generated
-- Updates in real-time as queue changes
-
-## Auto-play Implementation
-
-When a track finishes:
-1. `onEnded` event triggers `next()` action
-2. If queue has more tracks → play next track
-3. If queue empty and auto-play ON:
-   - Fetch AI recommendations via LLM
-   - Add to queue automatically
-   - Start playing immediately
-4. If repeat mode is:
-   - `off` - Stop playback after last track
-   - `one` - Replay current track
-   - `all` - Loop back to first track
-
-## Test Structure
-
-All tests follow this pattern:
-
-```typescript
-describe('Feature Name', () => {
-  describe('Specific Functionality', () => {
-    it('should do something specific', () => {
-      // Test implementation
-    });
-  });
-});
-```
-
-## Adding New Tests
-
-When adding new features:
-
-1. **Frontend** - Add test in `apps/web/tests/`
-2. **Backend** - Add test in `apps/backend/tests/`
-3. Follow existing patterns
-4. Ensure tests are isolated and don't depend on external services
-5. Use mocking for API calls
-
-## CI/CD Integration
-
-To add tests to CI/CD pipeline:
-
-```yaml
-# In your workflow file
-- name: Run Backend Tests
-  run: cd apps/backend && npm install && npm test
-
-- name: Run Frontend Tests
-  run: cd apps/web && npm install && npm test
-```
-
-## Debugging Tests
-
-### Frontend
 ```bash
-# Run with debugging info
-DEBUG=* npm test
-
-# Run single test file with watch
-npm test playerStore.test.ts -- --watch
+cd apps/web
+E2E_DATABASE_URL="postgresql://…/feo_e2e" npm run test:e2e
 ```
 
-### Backend
+La commande démarre l'API sur le port 3101 et le site sur le port 5174,
+attend qu'ils répondent, lance `cypress run` puis arrête tout. Comme pour
+l'intégration, utilisez une base ou un schéma réservé aux tests :
+`?options=-c%20search_path%3Dfeo_test` fonctionne aussi.
+
+Pour écrire ou déboguer un test, démarrez la pile puis ouvrez l'interface :
+
 ```bash
-# Run with debugging
-DEBUG=* npm test
-
-# Run with verbose output
-npm test -- --reporter spec
+E2E_DATABASE_URL=… npm run e2e:api   # terminal 1
+npm run e2e:web                      # terminal 2
+npm run e2e:open                     # terminal 3
 ```
+
+Scénarios couverts :
+
+- `auth.cy.ts` : redirection vers la connexion, validation du formulaire,
+  inscription → déconnexion → connexion, mauvais mot de passe, email déjà
+  utilisé, session conservée au rechargement.
+- `playback.cy.ts` : recherche, lecture via le proxy audio, pause/reprise et
+  titre suivant au clavier, bouton du lecteur.
+- `youtube-fallback.cy.ts` : l'API est bloquée par YouTube → la lecture
+  continue via le lecteur intégré, sans nouvel essai du proxy ; pause/reprise ;
+  titre refusé par l'intégration → titre suivant.
+- `library.cy.ts` : like persistant dans « Titres likés », création d'une
+  playlist depuis un titre, renommage et suppression.

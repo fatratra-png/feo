@@ -1,0 +1,29 @@
+// Stand-in for https://www.youtube.com/iframe_api: records what the app asks
+// for and simulates playback, without loading anything from YouTube.
+(function () {
+  var fake = (window.__fakeYT = { loaded: [], cued: [], players: 0, state: -1 });
+  function Player(el, opts) {
+    fake.players += 1;
+    var self = this, time = 0, timer = null;
+    var emit = function (s) { fake.state = s; opts.events.onStateChange && opts.events.onStateChange({ data: s }); };
+    var tick = function () { clearInterval(timer); timer = setInterval(function () { if (fake.state === 1) time += 0.25; }, 250); };
+    self.loadVideoById = function (id) { fake.loaded.push(id); time = 0; emit(3); setTimeout(function () { emit(1); tick(); }, 50); };
+    self.cueVideoById = function (id) { fake.cued.push(id); time = 0; emit(5); };
+    self.playVideo = function () { emit(1); tick(); };
+    self.pauseVideo = function () { emit(2); };
+    self.stopVideo = function () { clearInterval(timer); emit(5); };
+    self.seekTo = function (t) { time = t; };
+    self.setVolume = function (v) { fake.volume = v; };
+    self.mute = function () { fake.muted = true; };
+    self.unMute = function () { fake.muted = false; };
+    self.getCurrentTime = function () { return time; };
+    self.getDuration = function () { return 190; };
+    self.getPlayerState = function () { return fake.state; };
+    self.destroy = function () {};
+    fake.fail = function (code) { opts.events.onError && opts.events.onError({ data: code }); };
+    fake.end = function () { emit(0); };
+    setTimeout(function () { opts.events.onReady && opts.events.onReady({ target: self }); }, 0);
+  }
+  window.YT = { Player: Player };
+  setTimeout(function () { window.onYouTubeIframeAPIReady && window.onYouTubeIframeAPIReady(); }, 0);
+})();
