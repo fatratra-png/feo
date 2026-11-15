@@ -22,6 +22,8 @@ const ForgotPassword = lazy(() => pages.auth().then((m) => ({ default: m.ForgotP
 const ResetPassword = lazy(() => pages.auth().then((m) => ({ default: m.ResetPassword })));
 const OAuthCallback = lazy(() => pages.auth().then((m) => ({ default: m.OAuthCallback })));
 const Account = lazy(() => pages.account().then((m) => ({ default: m.Account })));
+const Privacy = lazy(() => pages.legal().then((m) => ({ default: m.Privacy })));
+const Terms = lazy(() => pages.legal().then((m) => ({ default: m.Terms })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -88,6 +90,9 @@ export function App() {
           {/* Reachable signed in or not: the link comes from an email. */}
           <Route path="/reset-password" element={<Suspense fallback={<Splash />}><ResetPassword /></Suspense>} />
           <Route path="/auth/callback" element={<Suspense fallback={<Splash />}><OAuthCallback /></Suspense>} />
+          {/* Public, signed in or not: linked from the Google/GitHub consent screens. */}
+          <Route path="/privacy" element={<Suspense fallback={<Splash />}><Privacy /></Suspense>} />
+          <Route path="/terms" element={<Suspense fallback={<Splash />}><Terms /></Suspense>} />
           <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={<Home />} />
             <Route path="search" element={<Suspense fallback={<PageFallback />}><Search /></Suspense>} />

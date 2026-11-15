@@ -29,6 +29,11 @@ function AuthLayout({ title, subtitle, children }: { title: string; subtitle: st
           <h1 className="mt-8 font-display text-3xl font-bold">{title}</h1>
           <p className="mt-1.5 text-fg-2">{subtitle}</p>
           <div className="mt-8">{children}</div>
+          <p className="mt-10 text-center text-xs text-fg-3">
+            <Link to="/terms" className="hover:text-fg hover:underline">Conditions d'utilisation</Link>
+            {' · '}
+            <Link to="/privacy" className="hover:text-fg hover:underline">Confidentialité</Link>
+          </p>
         </div>
       </div>
     </div>
