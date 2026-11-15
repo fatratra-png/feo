@@ -1,7 +1,12 @@
 import { ArrowLeft } from 'lucide-react';
 import { useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Logo } from '../components/layout/AppShell';
+import { Logo } from '../components/ui/Logo';
+
+/*
+ * No router or store imports here: these pages are also rendered to static
+ * HTML at build time (see vite.config.ts), so crawlers such as Google's OAuth
+ * review see the full text without running JavaScript. Hence plain <a> links.
+ */
 
 const CONTACT = 'nyfatratrar@gmail.com';
 const UPDATED = '15 novembre 2026';
@@ -15,10 +20,10 @@ function LegalPage({ title, children }: { title: string; children: React.ReactNo
     <div className="min-h-dvh bg-bg px-5 py-10 sm:py-16">
       <article className="mx-auto max-w-2xl">
         <div className="mb-10 flex items-center justify-between">
-          <Link to="/" aria-label="FEO, accueil"><Logo className="text-3xl" /></Link>
-          <Link to="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-fg-2 hover:text-fg">
+          <a href="/" aria-label="FEO, accueil"><Logo className="text-3xl" /></a>
+          <a href="/" className="inline-flex items-center gap-1.5 text-sm font-semibold text-fg-2 hover:text-fg">
             <ArrowLeft className="size-4" aria-hidden /> Retour à FEO
-          </Link>
+          </a>
         </div>
         <h1 className="font-display text-4xl font-extrabold tracking-tight">{title}</h1>
         <p className="mt-2 text-sm text-fg-3">Dernière mise à jour : {UPDATED}</p>
@@ -27,8 +32,8 @@ function LegalPage({ title, children }: { title: string; children: React.ReactNo
         </div>
         <footer className="mt-12 border-t border-line-strong pt-6 text-sm text-fg-3">
           Une question ? <a href={`mailto:${CONTACT}`} className="font-semibold text-accent-fg underline">{CONTACT}</a>
-          {' · '}<Link to="/privacy" className="hover:text-fg">Confidentialité</Link>
-          {' · '}<Link to="/terms" className="hover:text-fg">Conditions d'utilisation</Link>
+          {' · '}<a href="/privacy" className="hover:text-fg">Confidentialité</a>
+          {' · '}<a href="/terms" className="hover:text-fg">Conditions d'utilisation</a>
         </footer>
       </article>
     </div>

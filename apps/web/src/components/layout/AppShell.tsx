@@ -24,11 +24,9 @@ const NAV = [
   { to: '/library', label: 'Bibliothèque', icon: Library },
 ];
 
-export function Logo({ className }: { className?: string }) {
-  return (
-    <span className={cn('wordmark inline-block text-[30px] leading-none select-none', className)}>FEO<span className="dot">.</span></span>
-  );
-}
+import { Logo } from '../ui/Logo';
+
+export { Logo };
 
 /** Height of one main-nav row: the active pill slides by multiples of it. */
 const NAV_ROW = 44;
