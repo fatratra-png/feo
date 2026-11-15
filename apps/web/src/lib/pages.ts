@@ -10,6 +10,7 @@ export const pages = {
   auth: () => import('../pages/Auth'),
   account: () => import('../pages/Account'),
   legal: () => import('../pages/Legal'),
+  landing: () => import('../pages/Landing'),
 };
 
 const byPath: [prefix: string, page: keyof typeof pages][] = [

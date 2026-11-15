@@ -20,4 +20,21 @@ describe('Legal pages', () => {
   });
 });
 
+
+
+describe('Landing and install pages', () => {
+  it('welcomes anonymous visitors with the landing page and its install QR code', () => {
+    cy.visit('/');
+    cy.contains('h1', 'Henoy ara');
+    cy.get('#installer svg[role="img"]').should('have.attr', 'aria-label').and('contain', '/install');
+    cy.contains('a', 'Commencer gratuitement').should('have.attr', 'href', '/register');
+  });
+
+  it('explains how to install on Android and iPhone', () => {
+    cy.visit('/install');
+    cy.contains('h1', 'Installer FEO');
+    cy.contains('a', 'Télécharger pour Android').should('have.attr', 'href').and('match', /feo\.apk$/);
+    cy.contains("Sur l'écran d'accueil");
+  });
+});
 export {};

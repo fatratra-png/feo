@@ -27,6 +27,9 @@ describe('Authentication', () => {
     cy.location('pathname').should('eq', '/');
     cy.get('[aria-label="Menu du compte"]').should('contain.text', 'F').click();
     cy.contains('[role="menuitem"]', 'Se déconnecter').click();
+    // Signed out on "/": the landing page, with its way back in.
+    cy.contains('h1', 'Henoy ara');
+    cy.contains('a', 'Se connecter').click();
     cy.location('pathname').should('eq', '/login');
 
     cy.get('#email').type(email);

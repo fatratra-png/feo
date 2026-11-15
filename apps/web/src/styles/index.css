@@ -226,3 +226,28 @@ button:disabled { cursor: not-allowed; }
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- Landing page motion (off under prefers-reduced-motion) ---------- */
+@keyframes landing-intro-out { to { opacity: 0; visibility: hidden; } }
+@keyframes landing-logo-in { 0% { opacity: 0; transform: scale(0.8); letter-spacing: 0.2em; } 60% { opacity: 1; transform: scale(1.04); letter-spacing: 0; } 100% { transform: scale(1); } }
+@keyframes landing-dot-beat { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.9); } 70% { transform: scale(0.9); } }
+@keyframes landing-rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+@keyframes landing-float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-14px) rotate(0.5deg); } }
+@keyframes landing-glow { 0%, 100% { opacity: 0.35; transform: scale(0.95); } 50% { opacity: 0.6; transform: scale(1.05); } }
+
+.landing-intro { animation: landing-intro-out 450ms ease-in 1400ms forwards; }
+.landing-intro-logo { animation: landing-logo-in 800ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.landing-intro-logo .dot { display: inline-block; animation: landing-dot-beat 600ms ease-in-out 700ms 2; }
+.landing-rise { animation: landing-rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.landing-float { animation: landing-float 7s ease-in-out infinite; }
+.landing-glow { animation: landing-glow 6s ease-in-out infinite; }
+.reveal { opacity: 0; transform: translateY(32px); transition: opacity 700ms ease-out, transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.reveal.is-in { opacity: 1; transform: none; }
+/* The prerendered landing (dist/index.html) only shows to signed-out visitors of "/". */
+.hide-landing #root > [data-landing] { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-intro { display: none; }
+  .landing-rise, .landing-float, .landing-glow, .landing-intro-logo, .landing-intro-logo .dot { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}

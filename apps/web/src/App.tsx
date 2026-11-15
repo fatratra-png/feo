@@ -23,6 +23,8 @@ const ResetPassword = lazy(() => pages.auth().then((m) => ({ default: m.ResetPas
 const OAuthCallback = lazy(() => pages.auth().then((m) => ({ default: m.OAuthCallback })));
 const Account = lazy(() => pages.account().then((m) => ({ default: m.Account })));
 const Privacy = lazy(() => pages.legal().then((m) => ({ default: m.Privacy })));
+const Landing = lazy(() => pages.landing().then((m) => ({ default: m.Landing })));
+const Install = lazy(() => pages.landing().then((m) => ({ default: m.Install })));
 const Terms = lazy(() => pages.legal().then((m) => ({ default: m.Terms })));
 
 const queryClient = new QueryClient({
@@ -58,6 +60,8 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   const status = useAuthStore((s) => s.status);
   const location = useLocation();
   if (status === 'loading') return <Splash />;
+  // Anonymous visitors get the landing page on "/", the sign-in page everywhere else.
+  if (status === 'anonymous' && location.pathname === '/') return <Suspense fallback={<Splash />}><Landing /></Suspense>;
   if (status === 'anonymous') return <Navigate to="/login" replace state={{ from: location }} />;
   return <>{children}</>;
 }
@@ -92,6 +96,7 @@ export function App() {
           <Route path="/auth/callback" element={<Suspense fallback={<Splash />}><OAuthCallback /></Suspense>} />
           {/* Public, signed in or not: linked from the Google/GitHub consent screens. */}
           <Route path="/privacy" element={<Suspense fallback={<Splash />}><Privacy /></Suspense>} />
+          <Route path="/install" element={<Suspense fallback={<Splash />}><Install /></Suspense>} />
           <Route path="/terms" element={<Suspense fallback={<Splash />}><Terms /></Suspense>} />
           <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={<Home />} />
