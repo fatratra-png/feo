@@ -6,7 +6,10 @@ import { TTLCache } from './lib/cache';
 import { AppError, handler } from './lib/http';
 import { YT_ID } from './lib/types';
 import * as ai from './services/ai';
-import { auth, authenticate } from './services/auth';
+import { PASSWORD_MIN, auth, authenticate } from './services/auth';
+import { mailEnabled } from './services/mail';
+import { NONCE_COOKIE, PROVIDERS, Provider, appRedirect, enabledProviders, exchangeCode, finishLogin, startLogin, targetOf } from './services/oauth';
+import { config } from './config';
 import * as library from './services/library';
 import { aiPausedUntil, consumeAiQuota } from './services/llm';
 import { playlists } from './services/playlists';
@@ -62,7 +65,7 @@ const authLimit = rateLimit(Number(process.env.AUTH_RATE_LIMIT) || 10, 10 * 60 *
 router.post('/auth/register', authLimit, handler(async (req, res) => {
   const body = z.object({
     email: z.string().trim().email('email invalide'),
-    password: z.string().min(8, 'au moins 8 caractères').max(128),
+    password: z.string().min(PASSWORD_MIN, 'au moins 8 caractères').max(128),
     displayName: z.string().trim().min(2, 'au moins 2 caractères').max(60),
   }).parse(req.body);
   res.status(201).json(await auth.register(body.email, body.password, body.displayName));
@@ -79,6 +82,73 @@ router.post('/auth/refresh', handler(async (req, res) => {
 }));
 
 router.get('/auth/me', authenticate, handler(async (req, res) => res.json(await auth.me(req.userId!))));
+
+/* ---------------- passwords ---------------- */
+
+const newPassword = z.string().min(PASSWORD_MIN, 'au moins 8 caractères').max(128);
+
+router.put('/auth/password', authenticate, handler(async (req, res) => {
+  const body = z.object({ currentPassword: z.string().max(128).optional(), newPassword }).parse(req.body);
+  res.json(await auth.changePassword(req.userId!, body.currentPassword, body.newPassword));
+}));
+
+router.post('/auth/forgot-password', authLimit, handler(async (req, res) => {
+  const { email } = z.object({ email: z.string().trim().email('email invalide') }).parse(req.body);
+  try {
+    await auth.forgotPassword(email, `${config.frontendUrl}/reset-password`);
+  } catch (err) {
+    // Same answer either way: a failure must not reveal whether the account exists.
+    console.error('[auth] forgot-password failed:', (err as Error).message);
+  }
+  res.json({ ok: true });
+}));
+
+router.post('/auth/reset-password', authLimit, handler(async (req, res) => {
+  const body = z.object({ token: z.string().min(20).max(200), password: newPassword }).parse(req.body);
+  res.json(await auth.resetPassword(body.token, body.password));
+}));
+
+/* ---------------- Google / GitHub ---------------- */
+
+router.get('/auth/providers', (_req, res) => {
+  const enabled = enabledProviders();
+  res.json({ google: enabled.includes('google'), github: enabled.includes('github'), passwordResetEmail: mailEnabled() });
+});
+
+const providerParam = z.object({ provider: z.enum(PROVIDERS as [Provider, ...Provider[]]) });
+const readCookie = (header: string | undefined, name: string) =>
+  header?.split(';').map((c) => c.trim().split('=')).find(([k]) => k === name)?.[1];
+const nonceCookie = (value: string, maxAge: number) =>
+  `${NONCE_COOKIE}=${value}; Path=/api/auth/oauth; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${config.nodeEnv === 'production' ? '; Secure' : ''}`;
+
+router.get('/auth/oauth/:provider/start', authLimit, handler(async (req, res) => {
+  const { provider } = providerParam.parse(req.params);
+  const target = req.query.target === 'mobile' ? 'mobile' : 'web';
+  const { url, nonce } = startLogin(provider, target);
+  res.setHeader('Set-Cookie', nonceCookie(nonce, 600));
+  res.redirect(302, url);
+}));
+
+router.get('/auth/oauth/:provider/callback', handler(async (req, res) => {
+  const { provider } = providerParam.parse(req.params);
+  const state = typeof req.query.state === 'string' ? req.query.state : '';
+  res.setHeader('Set-Cookie', nonceCookie('', 0));
+  try {
+    // The user pressed "Cancel" on the provider's page.
+    if (typeof req.query.error === 'string') throw new Error('cancelled');
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    const result = await finishLogin(provider, code, state, readCookie(req.headers.cookie, NONCE_COOKIE));
+    res.redirect(302, appRedirect(result.target, { code: result.code }));
+  } catch (err) {
+    const message = (err as Error).message === 'cancelled' ? 'Connexion annulée.' : (err as Error).message;
+    res.redirect(302, appRedirect(targetOf(state), { error: message }));
+  }
+}));
+
+router.post('/auth/oauth/exchange', authLimit, handler(async (req, res) => {
+  const { code } = z.object({ code: z.string().min(10).max(200) }).parse(req.body);
+  res.json(await exchangeCode(code));
+}));
 
 router.post('/auth/logout', authenticate, handler(async (req, res) => {
   const { refreshToken } = z.object({ refreshToken: z.string().optional() }).parse(req.body ?? {});

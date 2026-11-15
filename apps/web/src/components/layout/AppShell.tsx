@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Heart, Home, Library, LogOut, Monitor, Moon, Plus, Search, Sparkles, Sun } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, Home, Library, LogOut, Monitor, Moon, Plus, Search, Sparkles, Sun, UserRound } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useLikedIds, usePlaylists } from '../../hooks/library';
@@ -271,6 +271,8 @@ function TopBar({ scrolled }: { scrolled: boolean }) {
           </div>
         }
         items={[
+          { label: 'Mon compte', icon: <UserRound />, onSelect: () => navigate('/account') },
+          'divider',
           { label: 'Thème clair', icon: <Sun />, onSelect: () => useThemeStore.getState().setPref('light') },
           { label: 'Thème sombre', icon: <Moon />, onSelect: () => useThemeStore.getState().setPref('dark') },
           { label: 'Suivre le système', icon: <Monitor />, onSelect: () => useThemeStore.getState().setPref('system') },

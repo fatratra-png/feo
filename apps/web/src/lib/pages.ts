@@ -8,6 +8,7 @@ export const pages = {
   create: () => import('../pages/Create'),
   collections: () => import('../pages/Collections'),
   auth: () => import('../pages/Auth'),
+  account: () => import('../pages/Account'),
 };
 
 const byPath: [prefix: string, page: keyof typeof pages][] = [
@@ -17,6 +18,7 @@ const byPath: [prefix: string, page: keyof typeof pages][] = [
   ['/liked', 'collections'],
   ['/playlist', 'collections'],
   ['/mix', 'collections'],
+  ['/account', 'account'],
 ];
 
 /** Starts loading the chunk behind a path (hover, focus, touch on a link). */

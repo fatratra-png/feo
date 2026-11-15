@@ -16,3 +16,13 @@ process.env.DATABASE_URL ??= 'postgresql://unused@localhost:1/unused';
 process.env.JWT_SECRET ??= 'test-access-secret';
 process.env.JWT_REFRESH_SECRET ??= 'test-refresh-secret';
 process.env.LLM_API_KEY = '';
+// Many sign-ins from one IP during the suite.
+process.env.AUTH_RATE_LIMIT ??= '10000';
+// Fake OAuth apps: the provider endpoints are stubbed in the tests.
+process.env.GOOGLE_CLIENT_ID ??= 'google-client';
+process.env.GOOGLE_CLIENT_SECRET ??= 'google-secret';
+process.env.GITHUB_CLIENT_ID ??= 'github-client';
+process.env.GITHUB_CLIENT_SECRET ??= 'github-secret';
+process.env.FRONTEND_URL ??= 'http://app.test';
+process.env.PUBLIC_API_URL ??= 'http://api.test/api';
+delete process.env.RESEND_API_KEY;

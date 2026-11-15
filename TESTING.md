@@ -42,6 +42,12 @@ Ce qui est couvert :
 - `innertube.test.ts` : lecture des réponses InnerTube (recherche, pagination,
   mix), erreurs HTTP, et le service `youtube` au-dessus (nettoyage des titres,
   doublons, direct et compilations écartés).
+- `auth.integration.test.ts` : changement de mot de passe, mot de passe
+  oublié et réinitialisation (lien à usage unique, limite d'envois, aucune
+  fuite sur l'existence d'un compte), connexion Google et GitHub (création,
+  liaison par email vérifié, protection CSRF, annulation, retour vers
+  l'app mobile).
+- `playlistBalance.test.ts` : respect des genres demandés dans les playlists IA.
 - `api.integration.test.ts` : inscription, connexion, rotation et révocation
   des refresh tokens, likes, écoutes et historique, playlists (création,
   ajout, réordonnancement, renommage, suppression, accès d'un autre
@@ -103,3 +109,7 @@ Scénarios couverts :
   titre refusé par l'intégration → titre suivant.
 - `library.cy.ts` : like persistant dans « Titres likés », création d'une
   playlist depuis un titre, renommage et suppression.
+- `account.cy.ts` : changement de mot de passe depuis « Mon compte »,
+  mot de passe oublié avec le lien reçu par email (lu via `/api/test/outbox`,
+  route montée seulement quand `NODE_ENV=test`), boutons Google/GitHub et
+  retour de connexion.

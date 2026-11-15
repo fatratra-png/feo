@@ -30,6 +30,20 @@ export const config = {
     accessExpiry: '15m',
     refreshDays: 30,
   },
+  /** Public URL of this API, used to build OAuth callback URLs (Render sets RENDER_EXTERNAL_URL). */
+  publicApiUrl: (process.env.PUBLIC_API_URL
+    || (process.env.RENDER_EXTERNAL_URL ? `${process.env.RENDER_EXTERNAL_URL}/api` : `http://localhost:${process.env.PORT || '3001'}/api`)).replace(/\/$/, ''),
+  oauth: {
+    google: { clientId: process.env.GOOGLE_CLIENT_ID || '', clientSecret: process.env.GOOGLE_CLIENT_SECRET || '' },
+    github: { clientId: process.env.GITHUB_CLIENT_ID || '', clientSecret: process.env.GITHUB_CLIENT_SECRET || '' },
+    /** Deep link the mobile app listens on after an OAuth login. */
+    mobileRedirect: process.env.MOBILE_OAUTH_REDIRECT || 'feo://auth',
+  },
+  mail: {
+    /** Resend (https://resend.com) API key. Without it, emails are printed to the logs instead. */
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    from: process.env.MAIL_FROM || 'FEO <onboarding@resend.dev>',
+  },
   ai: {
     baseUrl: (process.env.LLM_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/$/, ''),
     apiKey: process.env.LLM_API_KEY || '',

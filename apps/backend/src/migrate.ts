@@ -111,6 +111,39 @@ export async function migrate() {
         );
         console.log('[migrate] schema upgraded to v2 (v1 tables kept as legacy_*)');
       }
+
+      if (version < 3) {
+        await client.query(`
+        -- Accounts created with Google/GitHub have no password until the user sets one.
+        ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;
+
+        -- One row per external login linked to an account.
+        CREATE TABLE IF NOT EXISTS user_identities (
+          provider VARCHAR(20) NOT NULL,
+          provider_user_id VARCHAR(100) NOT NULL,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          email VARCHAR(255),
+          created_at TIMESTAMPTZ DEFAULT NOW(),
+          PRIMARY KEY (provider, provider_user_id)
+        );
+        CREATE INDEX IF NOT EXISTS user_identities_user_idx ON user_identities(user_id);
+
+        -- Single-use "forgot password" links (only the SHA-256 of the token is stored).
+        CREATE TABLE IF NOT EXISTS password_resets (
+          token_hash CHAR(64) PRIMARY KEY,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
+          expires_at TIMESTAMPTZ NOT NULL,
+          used_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets(user_id);
+        `);
+        await client.query(
+          `INSERT INTO schema_meta (key, value) VALUES ('version', '3')
+           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+        );
+        console.log('[migrate] schema upgraded to v3 (OAuth identities, password resets)');
+      }
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
