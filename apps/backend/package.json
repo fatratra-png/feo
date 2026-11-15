@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "db:migrate": "tsx src/migrate.ts",
     "typecheck": "tsc --noEmit",
-    "test": "mocha --import=tsx --extension ts \"tests/**/*.test.ts\" --timeout 10000 --exit"
+    "test": "mocha --import=tsx --extension ts --file tests/setup.ts \"tests/**/*.test.ts\" --timeout 10000 --exit"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -30,8 +30,10 @@
     "@types/mocha": "^10.0.6",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
+    "@types/supertest": "^6.0.3",
     "chai": "^4.3.10",
     "mocha": "^12.0.3",
+    "supertest": "^7.3.2",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
   }

@@ -1,24 +1,12 @@
-import compression from 'compression';
-import cors from 'cors';
-import express from 'express';
+import { createApp } from './app';
 import { aiEnabled, config } from './config';
-import { errorHandler } from './lib/http';
 import { migrate } from './migrate';
-import { router } from './routes';
 import { warmStarters } from './services/ai';
 
 async function main() {
   await migrate();
 
-  const app = express();
-  app.disable('x-powered-by');
-  app.use(cors({ origin: config.corsOrigins, credentials: true }));
-  // JSON (search results, playlists, home) shrinks ~5×; audio and images are skipped by type.
-  app.use(compression());
-  app.use(express.json({ limit: '1mb' }));
-  app.use('/api', router);
-  app.use('/api', (_req, res) => res.status(404).json({ message: 'Route introuvable' }));
-  app.use(errorHandler);
+  const app = createApp();
 
   const server = app.listen(config.port, () => {
     console.log(`FEO API → http://localhost:${config.port}/api`);

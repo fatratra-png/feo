@@ -13,3 +13,6 @@ coverage/
 .tmp/node_modules/
 dist/
 .neon
+**/cypress/screenshots
+**/cypress/videos
+**/cypress/downloads

@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "e2e:api": "cd ../backend && NODE_ENV=test PORT=3101 AUTH_RATE_LIMIT=100000 FRONTEND_URL=http://localhost:5174 LLM_API_KEY= DATABASE_URL=\"$E2E_DATABASE_URL\" DATABASE_URL_UNPOOLED=\"$E2E_DATABASE_URL\" npx tsx src/index.ts",
+    "e2e:web": "VITE_API_URL=http://localhost:3101/api vite --port 5174 --strictPort",
+    "e2e:open": "cypress open --e2e",
+    "test:e2e": "start-server-and-test e2e:api http://localhost:3101/api/health e2e:web http://localhost:5174 'cypress run --e2e --browser ${CYPRESS_BROWSER:-chrome}'"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.4",
@@ -20,9 +24,14 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
+    "cypress": "^16.2.0",
+    "jsdom": "^26.1.0",
+    "start-server-and-test": "^2.1.5",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^6.4.3",
