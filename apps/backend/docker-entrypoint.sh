@@ -37,6 +37,8 @@ if [ -n "$YTDLP_COOKIES_B64" ] && [ -z "$YTDLP_COOKIES" ]; then
     rm -f "$COOKIE_FILE"
     echo "[entrypoint] YTDLP_COOKIES_B64 could not be decoded: yt-dlp runs without cookies" >&2
   fi
+elif [ -n "$YTDLP_COOKIES" ]; then
+  echo "[entrypoint] using the cookie file from YTDLP_COOKIES ($YTDLP_COOKIES)"
 else
   echo "[entrypoint] no YTDLP_COOKIES_B64: yt-dlp runs without cookies (YouTube may block it)"
 fi
