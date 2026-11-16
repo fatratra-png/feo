@@ -80,7 +80,7 @@ export async function createEmbedPlayer(host: HTMLElement, events: EmbedEvents):
 
 /* Once the proxy failed, stay on the embed for a while instead of failing again on every song. */
 const STICKY_KEY = 'feo_embed_until';
-const STICKY_MS = 30 * 60 * 1000;
+const STICKY_MS = 365 * 24 * 60 * 60 * 1000; // 1 an
 
 export function embedPreferred(): boolean {
   try { return Number(localStorage.getItem(STICKY_KEY) || 0) > Date.now(); } catch { return false; }
