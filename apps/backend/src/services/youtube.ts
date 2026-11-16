@@ -25,7 +25,10 @@ export class YouTubeBlockedError extends Error {
 export const isBotCheck = (message: string) => /confirm you.?re not a bot|sign in to confirm|HTTP Error 429|too many requests/i.test(message);
 
 const BOT_COOLDOWN_MS = 3 * 60 * 1000;
+/** A failed resolution costs two yt-dlp runs: pause briefly so clients use the embed instead. */
+const RESOLVE_FAIL_COOLDOWN_MS = 90 * 1000;
 let blockedUntil = 0;
+let resolveFailedUntil = 0;
 
 /** Optional cookies (exported from a logged-in browser) make YouTube far less likely to block. */
 function cookieArgs(): string[] {
@@ -34,7 +37,10 @@ function cookieArgs(): string[] {
   return [];
 }
 
-export const youtubeBlockedUntil = () => (blockedUntil > Date.now() ? new Date(blockedUntil).toISOString() : null);
+export const youtubeBlockedUntil = () => {
+  const until = Math.max(blockedUntil, resolveFailedUntil);
+  return until > Date.now() ? new Date(until).toISOString() : null;
+};
 
 async function ytdlp(args: string[], timeout = 20000): Promise<string> {
   // Hammering YouTube while it is challenging us only extends the block: back off instead.
@@ -177,6 +183,8 @@ export const youtube = {
   async streamUrl(videoId: string, fresh = false): Promise<string | null> {
     if (!YT_ID.test(videoId)) return null;
     if (fresh) streamCache.delete(videoId);
+    // Fail fast while the block lasts: clients get 502 in milliseconds and switch to the embed.
+    if (resolveFailedUntil > Date.now()) return null;
     const cached = streamCache.get(videoId);
     if (cached) return cached;
     // A JS runtime lets yt-dlp solve YouTube's signature challenge. Without it,
@@ -185,7 +193,7 @@ export const youtube = {
     for (const extra of attempts) {
       try {
         const args = [...extra, '-f', 'bestaudio[ext=m4a]/bestaudio', '--get-url'];
-        const out = (await ytdlp([...args, `https://www.youtube.com/watch?v=${videoId}`], 30000)).trim().split('\n')[0];
+        const out = (await ytdlp([...args, `https://www.youtube.com/watch?v=${videoId}`], 15000)).trim().split('\n')[0];
         if (out?.startsWith('http')) {
           const expire = Number(new URL(out).searchParams.get('expire')) * 1000;
           const ttl = expire ? Math.max(MIN, expire - Date.now() - 10 * MIN) : 60 * MIN;
@@ -197,6 +205,7 @@ export const youtube = {
         console.warn('[youtube] stream url failed', videoId, (err as Error).message.split('\n').slice(-2).join(' '));
       }
     }
+    resolveFailedUntil = Date.now() + RESOLVE_FAIL_COOLDOWN_MS;
     return null;
   },
 };

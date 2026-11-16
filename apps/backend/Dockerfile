@@ -17,6 +17,9 @@ RUN apt-get update \
   && /opt/yt-dlp/bin/pip install --no-cache-dir 'yt-dlp[default]>=2026.10' \
   && ln -s /opt/yt-dlp/bin/yt-dlp /usr/local/bin/yt-dlp
 
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 ENV NODE_ENV=production
 COPY --from=build /app/package.json /app/package-lock.json ./
 COPY --from=build /app/node_modules ./node_modules
@@ -24,4 +27,6 @@ COPY --from=build /app/dist ./dist
 
 USER node
 EXPOSE 3001
+# Writes YouTube cookies from YTDLP_COOKIES_B64 before starting the API.
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

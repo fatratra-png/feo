@@ -19,3 +19,6 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      # base64 -w0 cookies.txt: without it YouTube blocks yt-dlp from Render's IPs.
+      - key: YTDLP_COOKIES_B64
+        sync: false
