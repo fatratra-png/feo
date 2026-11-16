@@ -1,6 +1,9 @@
 node_modules/
 dist/
 .opencode/
+.claude/
+.idea/
+.zed/
 .env
 *.local
 .DS_Store
@@ -16,3 +19,4 @@ dist/
 **/cypress/screenshots
 **/cypress/videos
 **/cypress/downloads
+.tmp/qr/
