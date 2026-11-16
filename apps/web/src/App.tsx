@@ -26,6 +26,7 @@ const Privacy = lazy(() => pages.legal().then((m) => ({ default: m.Privacy })));
 const Landing = lazy(() => pages.landing().then((m) => ({ default: m.Landing })));
 const Install = lazy(() => pages.landing().then((m) => ({ default: m.Install })));
 const Terms = lazy(() => pages.legal().then((m) => ({ default: m.Terms })));
+const NotFound = lazy(() => pages.notFound().then((m) => ({ default: m.NotFound })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -98,6 +99,8 @@ export function App() {
           <Route path="/privacy" element={<Suspense fallback={<Splash />}><Privacy /></Suspense>} />
           <Route path="/install" element={<Suspense fallback={<Splash />}><Install /></Suspense>} />
           <Route path="/terms" element={<Suspense fallback={<Splash />}><Terms /></Suspense>} />
+          {/* Public: a signed-in visitor with a bad link should not land on the sign-in page. */}
+          <Route path="/not-found" element={<Suspense fallback={<Splash />}><NotFound /></Suspense>} />
           <Route element={<RequireAuth><AppShell /></RequireAuth>}>
             <Route index element={<Home />} />
             <Route path="search" element={<Suspense fallback={<PageFallback />}><Search /></Suspense>} />
@@ -107,8 +110,9 @@ export function App() {
             <Route path="playlist/:id" element={<Suspense fallback={<PageFallback />}><PlaylistPage /></Suspense>} />
             <Route path="mix/:id" element={<Suspense fallback={<PageFallback />}><MixPage /></Suspense>} />
             <Route path="account" element={<Suspense fallback={<PageFallback />}><Account /></Suspense>} />
-            <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
+          {/* Unknown URLs used to redirect home; a real 404 page is clearer. */}
+          <Route path="*" element={<Suspense fallback={<Splash />}><NotFound /></Suspense>} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>
