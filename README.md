@@ -159,6 +159,7 @@ Free AI models are slow, rate-limited and sometimes down. FEO is built to keep p
 - **yt-dlp runs asynchronously** and its results are cached, so the home page never waits on a YouTube search.
 - **The audio proxy supports HTTP Range requests and serves audio in slices**, and it resumes slices that were interrupted. Seeking stays instant and long songs don't cut out.
 - **Anti-bot back-off:** when YouTube asks for a challenge, the API pauses yt-dlp for 3 minutes and returns `503 YOUTUBE_BLOCKED` instead of failing silently. Adding cookies makes these challenges much rarer.
+- **Fast fallback when YouTube refuses anyway:** a failed resolution pauses the audio proxy for 90 seconds and shows up in `/api/health`, so clients switch to the YouTube embed at once instead of waiting out two yt-dlp attempts.
 - **Gzip JSON**, **one SQL statement per playlist write**, **prefetched pages and split vendor chunks** keep everything fast.
 
 ---
@@ -193,6 +194,19 @@ npm run dev:web        # web → http://localhost:5173
 > The backend loads the root `.env.local` **before** `apps/backend/.env`, and values already set are not overwritten.
 > If the root file points to a hosted database, local development will use **that** database.
 
+### Install the Android app
+
+Every release ships a signed APK, no store involved:
+
+```
+https://github.com/fatratra-png/feo/releases/latest/download/feo.apk
+```
+
+It targets Android 7 and later (arm64 and 32-bit ARM) and talks to the hosted API. To build it yourself,
+`npx expo prebuild -p android` then `./gradlew assembleRelease` with `EXPO_PUBLIC_API_URL` pointing at your API.
+On iPhone, the same Expo project runs from `npx expo start`, or through EAS Build: an installable iOS build
+needs an Apple developer account and a Mac (or EAS) to sign it, so no `.ipa` is published here.
+
 ### Mobile (Expo SDK 58)
 
 ```bash
@@ -220,6 +234,7 @@ Everything lives in `apps/backend/.env`:
 | `AI_MODEL`, `AI_MODEL_FAST`, `AI_MODEL_ALT`, `AI_FALLBACK_MODEL` | The model chain |
 | `AI_TIMEOUT_MS`, `AI_DAILY_LIMIT_PER_USER` | Per-call timeout and daily quota per user |
 | `YTDLP_COOKIES` or `YTDLP_COOKIES_FROM_BROWSER` | Optional YouTube cookies (a `cookies.txt` file, or a browser name like `firefox`) |
+| `YTDLP_COOKIES_B64` | Docker only: the same `cookies.txt`, base64-encoded. The entrypoint writes it to `/tmp` on startup — the way to add cookies on Render, whose IPs YouTube blocks |
 
 The web app only needs `VITE_API_URL` at build time. It must not contain any secret.
 
