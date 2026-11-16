@@ -11,6 +11,7 @@ export const pages = {
   account: () => import('../pages/Account'),
   legal: () => import('../pages/Legal'),
   landing: () => import('../pages/Landing'),
+  notFound: () => import('../pages/NotFound'),
 };
 
 const byPath: [prefix: string, page: keyof typeof pages][] = [
